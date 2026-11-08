@@ -1,0 +1,33 @@
+node_modules
+.next
+out
+build
+dist
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.vercel
+/tmp
+*.log
+
+# Customer data, exports, and local database backups
+/Personal Toyota CRM.xlsx
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+/exports/
+/backups/
+/database-backups/
+/customer-data/
+/sensitive-records/
+/supabase/import-workbook-data.sql
+*.dump
+*.backup
+*.bak
+*.sql.gz
