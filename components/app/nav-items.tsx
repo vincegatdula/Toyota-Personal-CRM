@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   BarChart3,
   CalendarClock,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { isSettingsNavActive, isUserManagementNavActive } from "@/lib/settings-tabs";
 
 const ICONS: Record<string, LucideIcon> = {
   LayoutDashboard,
@@ -31,6 +32,8 @@ const ICONS: Record<string, LucideIcon> = {
   Shield,
 };
 
+type NavItem = { href: string; label: string; icon: keyof typeof ICONS };
+
 export function NavItems({
   onNavigate,
   className,
@@ -41,38 +44,47 @@ export function NavItems({
   isAdmin?: boolean;
 }) {
   const pathname = usePathname();
-  const items = isAdmin
-    ? [...NAV_ITEMS.slice(0, -1), { href: "/settings?tab=admin", label: "Admin", icon: "Shield" as const }, NAV_ITEMS[NAV_ITEMS.length - 1]]
-    : [...NAV_ITEMS];
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab");
+
+  const items: NavItem[] = isAdmin
+    ? [
+        ...NAV_ITEMS.slice(0, -1).map((item) => ({
+          ...item,
+          href: item.href === "/settings" ? "/settings?tab=profile" : item.href,
+        })),
+        { href: "/settings?tab=admin", label: "User management", icon: "Shield" },
+        { href: "/settings?tab=profile", label: "Settings", icon: "Settings" },
+      ]
+    : [...NAV_ITEMS].map((item) => ({
+        ...item,
+        href: item.href === "/settings" ? "/settings?tab=profile" : item.href,
+      }));
 
   return (
     <nav className={cn("flex flex-col gap-0.5", className)}>
       {items.map((item) => {
         const Icon = ICONS[item.icon] ?? LayoutDashboard;
         const active =
-          item.href === "/settings?tab=admin"
-            ? pathname.startsWith("/settings")
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const label = item.href === "/settings?tab=admin" ? "User management" : item.label;
+          item.icon === "Shield"
+            ? isUserManagementNavActive(pathname, tab, Boolean(isAdmin))
+            : item.href.startsWith("/settings")
+              ? isSettingsNavActive(pathname, tab, Boolean(isAdmin))
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
-            key={item.href}
+            key={`${item.href}-${item.label}`}
             href={item.href}
             onClick={onNavigate}
             className={cn(
               "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors",
-              active && (item.href !== "/settings?tab=admin" || pathname.startsWith("/settings"))
+              active
                 ? "bg-[#f2f1ef] text-foreground"
                 : "text-stone-600 hover:bg-[#f6f5f3] hover:text-foreground",
             )}
           >
-            <Icon
-              className={cn(
-                "h-4 w-4",
-                active && (item.href !== "/settings?tab=admin" || pathname.startsWith("/settings")) ? "text-brand" : "text-stone-400",
-              )}
-            />
-            <span className="truncate">{label}</span>
+            <Icon className={cn("h-4 w-4", active ? "text-brand" : "text-stone-400")} />
+            <span className="truncate">{item.label}</span>
           </Link>
         );
       })}

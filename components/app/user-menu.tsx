@@ -40,7 +40,7 @@ export function UserMenu({
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings">
+          <Link href="/settings?tab=profile">
             <UserRound /> Profile
           </Link>
         </DropdownMenuItem>
@@ -54,7 +54,7 @@ export function UserMenu({
             <Link href="/settings?tab=admin">
               <Shield /> User management
             </Link>
-          </DropdownMenuItem>
+            </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
         <form action={signOut}>

@@ -10,15 +10,21 @@ import {
 } from "@/lib/data/options";
 import { createAvatarSignedUrl } from "@/lib/avatar";
 import { listProfilesForAdmin } from "@/lib/admin-users";
+import { resolveSettingsTab } from "@/lib/settings-tabs";
 import { currentPeriod } from "@/lib/dates";
 import type { Profile } from "@/types/database";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const { supabase, user } = await getSession();
   if (!user) redirect("/login");
 
+  const params = await searchParams;
   const [profileRes, options, models, targets] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
     getAllOptions(),
@@ -29,6 +35,10 @@ export default async function SettingsPage() {
   const profile = (profileRes.data as Profile | null) ?? null;
   const avatarUrl = await createAvatarSignedUrl(profile?.avatar_url, user.id);
   const isAdmin = isCrmAdmin(profile?.role);
+  if (!params.tab || resolveSettingsTab(params.tab, isAdmin) !== params.tab) {
+    redirect(`/settings?tab=${resolveSettingsTab(params.tab, isAdmin)}`);
+  }
+
   const adminProfiles = isAdmin
     ? await Promise.all(
         (await listProfilesForAdmin()).map(async (row) => ({

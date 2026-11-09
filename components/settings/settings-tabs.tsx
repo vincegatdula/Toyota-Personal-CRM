@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Database,
@@ -28,6 +27,7 @@ import { ListsManager } from "@/components/settings/lists-manager";
 import { ModelsManager } from "@/components/settings/models-manager";
 import { TargetsManager } from "@/components/settings/targets-manager";
 import { AdminUsersManager } from "@/components/settings/admin-users-manager";
+import { resolveSettingsTab } from "@/lib/settings-tabs";
 import type { OptionMap } from "@/lib/data/options";
 import type {
   MonthlyTarget,
@@ -68,22 +68,15 @@ export function SettingsTabs({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const requested = searchParams.get("tab");
-  const defaultValue = useMemo(() => {
-    const allowed = new Set(["profile", "lists", "models", "targets", "data", "admin"]);
-    if (requested && allowed.has(requested)) {
-      if (requested === "admin" && !isAdmin) return "profile";
-      return requested;
-    }
-    return "profile";
-  }, [isAdmin, requested]);
+  const activeTab = resolveSettingsTab(searchParams.get("tab"), isAdmin);
 
   return (
     <Tabs
-      value={defaultValue}
+      value={activeTab}
       onValueChange={(value) => {
+        const nextTab = resolveSettingsTab(value, isAdmin);
         const params = new URLSearchParams(searchParams.toString());
-        params.set("tab", value);
+        params.set("tab", nextTab);
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
       }}
       className="space-y-3"
@@ -103,7 +96,7 @@ export function SettingsTabs({
         </TabsTrigger>
         {isAdmin ? (
           <TabsTrigger value="admin">
-            <Shield className="mr-1 h-3.5 w-3.5" /> Admin
+            <Shield className="mr-1 h-3.5 w-3.5" /> User management
           </TabsTrigger>
         ) : null}
         <TabsTrigger value="data">
