@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Database,
   Download,
@@ -10,6 +12,7 @@ import {
   UserRound,
   Car,
   ArrowRight,
+  Shield,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -24,6 +27,7 @@ import { ProfileForm } from "@/components/settings/profile-form";
 import { ListsManager } from "@/components/settings/lists-manager";
 import { ModelsManager } from "@/components/settings/models-manager";
 import { TargetsManager } from "@/components/settings/targets-manager";
+import { AdminUsersManager } from "@/components/settings/admin-users-manager";
 import type { OptionMap } from "@/lib/data/options";
 import type {
   MonthlyTarget,
@@ -31,29 +35,59 @@ import type {
   VehicleModel,
 } from "@/types/database";
 
+type AdminProfile = Profile & { avatar_signed_url?: string | null };
+
 export function SettingsTabs({
   profile,
   email,
+  avatarUrl,
   options,
   models,
   targets,
   initialYear,
   initialMonth,
   canManageModels,
+  isAdmin,
+  adminProfiles,
+  currentUserId,
 }: {
   profile: Profile | null;
   email: string;
+  avatarUrl?: string | null;
   options: OptionMap;
   models: VehicleModel[];
   targets: MonthlyTarget[];
   initialYear: number;
   initialMonth: number;
   canManageModels: boolean;
+  isAdmin: boolean;
+  adminProfiles: AdminProfile[];
+  currentUserId: string;
 }) {
   const period = `${initialYear}-${String(initialMonth).padStart(2, "0")}`;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requested = searchParams.get("tab");
+  const defaultValue = useMemo(() => {
+    const allowed = new Set(["profile", "lists", "models", "targets", "data", "admin"]);
+    if (requested && allowed.has(requested)) {
+      if (requested === "admin" && !isAdmin) return "profile";
+      return requested;
+    }
+    return "profile";
+  }, [isAdmin, requested]);
 
   return (
-    <Tabs defaultValue="profile" className="space-y-3">
+    <Tabs
+      value={defaultValue}
+      onValueChange={(value) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tab", value);
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      }}
+      className="space-y-3"
+    >
       <TabsList className="flex-wrap">
         <TabsTrigger value="profile">
           <UserRound className="mr-1 h-3.5 w-3.5" /> Profile
@@ -67,13 +101,18 @@ export function SettingsTabs({
         <TabsTrigger value="targets">
           <Target className="mr-1 h-3.5 w-3.5" /> Targets
         </TabsTrigger>
+        {isAdmin ? (
+          <TabsTrigger value="admin">
+            <Shield className="mr-1 h-3.5 w-3.5" /> Admin
+          </TabsTrigger>
+        ) : null}
         <TabsTrigger value="data">
           <Database className="mr-1 h-3.5 w-3.5" /> Data
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="profile">
-        <ProfileForm profile={profile} email={email} />
+        <ProfileForm profile={profile} email={email} avatarUrl={avatarUrl} />
       </TabsContent>
 
       <TabsContent value="lists">
@@ -113,6 +152,17 @@ export function SettingsTabs({
           initialMonth={initialMonth}
         />
       </TabsContent>
+
+      {isAdmin ? (
+        <TabsContent value="admin">
+          <AdminUsersManager
+            profiles={adminProfiles}
+            initialYear={initialYear}
+            initialMonth={initialMonth}
+            currentUserId={currentUserId}
+          />
+        </TabsContent>
+      ) : null}
 
       <TabsContent value="data">
         <div className="grid gap-3 lg:grid-cols-2">
@@ -180,9 +230,9 @@ export function SettingsTabs({
                   instead.
                 </li>
                 <li>
-                  Every table is protected by row-level security scoped to your
-                  account. Dropdowns and vehicle models are shared reference
-                  lists.
+                  Every table is protected by row-level security. Shared lists
+                  and models are admin-managed; personal records remain scoped to
+                  the signed-in account unless admin access applies.
                 </li>
                 <li>
                   Targets are resolved per month: your personal target wins,

@@ -18,6 +18,7 @@ export interface PagedFilters {
   from?: string;
   to?: string;
   overdue?: string;
+  owner?: string;
   page?: number;
   pageSize?: number;
 }
@@ -98,6 +99,7 @@ export async function listFinancing(
     .from("financing_applications")
     .select("*", { count: "exact" });
   if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  else if (filters.owner) query = query.eq("owner_id", filters.owner);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;
@@ -168,6 +170,7 @@ export async function listReservations(
     .from("reservations")
     .select("*", { count: "exact" });
   if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  else if (filters.owner) query = query.eq("owner_id", filters.owner);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;
@@ -248,6 +251,7 @@ export async function listReleases(
     .from("vehicle_releases")
     .select("*", { count: "exact" });
   if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  else if (filters.owner) query = query.eq("owner_id", filters.owner);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;
@@ -309,6 +313,7 @@ export async function listLostSales(
     .from("lost_sales")
     .select("*", { count: "exact" });
   if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  else if (filters.owner) query = query.eq("owner_id", filters.owner);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;

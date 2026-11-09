@@ -23,6 +23,7 @@ export interface LeadFilters {
   createdFrom?: string;
   createdTo?: string;
   archived?: string;
+  owner?: string;
   sort?: string;
   page?: number;
   pageSize?: number;
@@ -75,6 +76,7 @@ export async function listLeads(filters: LeadFilters): Promise<LeadListResult> {
     .from("leads")
     .select("*", { count: "exact" });
   if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  else if (filters.owner) query = query.eq("owner_id", filters.owner);
 
   query = filters.archived === "1"
     ? query.eq("is_archived", true)

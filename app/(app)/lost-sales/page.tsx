@@ -17,8 +17,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAuthContext } from "@/lib/auth";
 import { listLostSales } from "@/lib/data/records";
 import { getOptions, optionLabels } from "@/lib/data/options";
+import { getProfileMap, listAssignableProfiles, profileLabel } from "@/lib/data/profiles";
 import {
   LOST_SALE_REASON_FALLBACK,
   OPTION_CATEGORIES,
@@ -38,21 +40,26 @@ export default async function LostSalesPage({
   searchParams: Promise<Params>;
 }) {
   const params = await searchParams;
+  const context = await getAuthContext();
+  const isAdmin = context.isAdmin;
   const filters = {
     q: one(params.q),
     reason: one(params.reason),
     recovery: one(params.recovery),
     from: one(params.from),
     to: one(params.to),
+    owner: isAdmin ? one(params.owner) : undefined,
     page: Number(one(params.page)) || 1,
   };
-  const [result, options] = await Promise.all([
+  const [result, options, owners, profileMap] = await Promise.all([
     listLostSales(filters),
     getOptions(),
+    isAdmin ? listAssignableProfiles() : Promise.resolve([]),
+    isAdmin ? getProfileMap() : Promise.resolve(new Map()),
   ]);
   const reasons = optionLabels(options, OPTION_CATEGORIES.lostSaleReason);
   const hasFilters = Boolean(
-    filters.q || filters.reason || filters.recovery || filters.from || filters.to,
+    filters.q || filters.reason || filters.recovery || filters.from || filters.to || filters.owner,
   );
   const recoverableCount = result.rows.filter(
     (row) => row.recoverable && row.recovery_status === "open",
@@ -63,7 +70,7 @@ export default async function LostSalesPage({
       <PageHeader
         eyebrow="CRM"
         title="Lost Sales"
-        description={`${result.count} ${pluralize(result.count, "lost sale")} recorded. ${recoverableCount} recoverable ${recoverableCount === 1 ? "case is" : "cases are"} still open on this page.`}
+        description={`${result.count} ${pluralize(result.count, "lost sale")} recorded. ${recoverableCount} recoverable ${recoverableCount === 1 ? "case is" : "cases are"} still open on this page.${isAdmin ? " Admins can view all users and filter by owner." : ""}`}
         actions={
           <Button asChild size="sm">
             <Link href="/lost-sales/new">
@@ -78,6 +85,14 @@ export default async function LostSalesPage({
           defaultValue={filters.q}
           placeholder="Search reason, competitor, or prospect…"
         />
+        {isAdmin ? (
+          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+            <option value="">All owners</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>
+            ))}
+          </Select>
+        ) : null}
         <Select name="reason" defaultValue={filters.reason ?? ""} className="h-8 w-auto min-w-40">
           <option value="">All reasons</option>
           {(reasons.length ? reasons : LOST_SALE_REASON_FALLBACK).map((reason) => (
@@ -125,6 +140,7 @@ export default async function LostSalesPage({
               <TableRow>
                 <TableHead>Lost sale</TableHead>
                 <TableHead>Prospect</TableHead>
+                {isAdmin ? <TableHead>Owner</TableHead> : null}
                 <TableHead>Reason</TableHead>
                 <TableHead>Stage</TableHead>
                 <TableHead>Recovery</TableHead>
@@ -153,6 +169,7 @@ export default async function LostSalesPage({
                       {row.lead_code}
                     </span>
                   </TableCell>
+                  {isAdmin ? <TableCell><Badge tone="neutral">{profileLabel(profileMap.get(row.owner_id), row.owner_id)}</Badge></TableCell> : null}
                   <TableCell className="max-w-[240px] truncate">
                     {row.primary_loss_reason || "—"}
                     {row.competitor_alternative ? (

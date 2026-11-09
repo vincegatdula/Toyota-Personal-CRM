@@ -41,20 +41,28 @@ cp .env.example .env.local
 # fill in the Supabase values (see below)
 ```
 
+> **Branding asset:** place the approved Toyota logo file at `public/brand/toyota-logo.svg` (preferred) or `public/brand/toyota-logo.png`. The UI falls back to a generic car icon if the asset is missing; do not commit unapproved trademark assets.
+
 ### 1. Supabase setup
 
 1. Create a project at https://supabase.com.
-2. Open **SQL Editor** and run the migrations **in order**:
+2. Open **SQL Editor** and review/run migrations **in order** as needed for the target environment:
    - `supabase/migrations/0001_schema.sql`
    - `supabase/migrations/0002_rls.sql`
    - `supabase/migrations/0003_seed_lists.sql`
    - `supabase/migrations/0004_security_hardening.sql`
+   - `supabase/migrations/0005_admin_full_access.sql` (**do not reapply blindly if already manually applied in production**; verify live schema/state first)
+   - `supabase/migrations/0006_admin_user_avatar_and_reconciliation.sql` (additive reconciliation for admin/user role handling, invite/auth trigger compatibility, admin target policy reinforcement, and avatar Storage RLS policies)
 3. In **Project Settings → API**, copy:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (server-only; never expose)
-4. Set `NEXT_PUBLIC_SITE_URL` to the app URL (for local development, `http://localhost:3000`).
-5. Authentication → Providers → Email: enable it. For the fastest local start, turn off **Confirm email**. Otherwise confirm the signup email before signing in.
+   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (**server-only; never expose to browser/client bundles**). Required for admin account management and trusted avatar storage operations.
+4. Supabase Storage:
+   - Create a bucket named `profile-avatars` (recommended: **private**).
+   - Apply/review Storage policies from `0006` (or equivalent manual policies) so users can manage only `avatars/<their-user-id>/...` and admins can manage avatar objects as needed.
+   - The app stores avatar object paths in `profiles.avatar_url` and generates signed URLs server-side for display.
+5. Set `NEXT_PUBLIC_SITE_URL` to the app URL (for local development, `http://localhost:3000`).
+6. Authentication → Providers → Email: enable it. For the fastest local start, turn off **Confirm email** if appropriate for your environment. Admin-created accounts are confirmed server-side by the app when service-role access is configured.
 
 ### 2. Environment variables
 

@@ -17,6 +17,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { ProgressBar } from "@/components/shared/progress-bar";
 import { EmptyState } from "@/components/shared/empty-state";
+import { DashboardBrand } from "@/components/dashboard/dashboard-brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,47 +66,51 @@ export default async function DashboardPage({
 
   return (
     <div className="page-container">
-      <PageHeader
-        eyebrow="Workspace"
-        title={`Good day${data.profileName ? `, ${data.profileName.split(" ")[0]}` : ""}`}
-        description={`${MONTHS[month - 1]} ${year} performance at a glance. ${data.remainingWorkingDays} working day${data.remainingWorkingDays === 1 ? "" : "s"} remaining in the period.`}
-        actions={
-          <>
-            <form method="get" className="flex items-center gap-1.5">
-              <select
-                name="month"
-                defaultValue={month}
-                className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]"
-              >
-                {MONTHS.map((label, index) => (
-                  <option key={label} value={index + 1}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <select
-                name="year"
-                defaultValue={year}
-                className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]"
-              >
-                {years.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-              <Button type="submit" size="sm" variant="outline">
-                View
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <PageHeader
+          eyebrow="Workspace"
+          title={`Good day${data.profileName ? `, ${data.profileName.split(" ")[0]}` : ""}`}
+          description={`${MONTHS[month - 1]} ${year} performance at a glance. ${data.remainingWorkingDays} working day${data.remainingWorkingDays === 1 ? "" : "s"} remaining in the period.`}
+          className="mb-0 flex-1"
+          actions={
+            <>
+              <DashboardBrand />
+              <form method="get" className="flex items-center gap-1.5">
+                <select
+                  name="month"
+                  defaultValue={month}
+                  className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]"
+                >
+                  {MONTHS.map((label, index) => (
+                    <option key={label} value={index + 1}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  name="year"
+                  defaultValue={year}
+                  className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]"
+                >
+                  {years.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+                <Button type="submit" size="sm" variant="outline">
+                  View
+                </Button>
+              </form>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/reports?year=${year}&month=${month}`}>
+                  <FileText /> Reports
+                </Link>
               </Button>
-            </form>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/reports?year=${year}&month=${month}`}>
-                <FileText /> Reports
-              </Link>
-            </Button>
-          </>
-        }
-      />
+            </>
+          }
+        />
+      </div>
 
       <section className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
         <StatCard

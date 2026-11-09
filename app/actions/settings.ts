@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireCrmAdmin, requireAuthContext } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { AVATAR_ACCEPT, AVATAR_BUCKET, AVATAR_MAX_BYTES } from "@/lib/brand";
 import {
   dropdownOptionSchema,
   formToObject,
@@ -14,6 +16,27 @@ import { actionError, bool, n, type ActionState } from "@/lib/actions-helpers";
 function revalidateSettings() {
   revalidatePath("/settings");
   revalidatePath("/", "layout");
+}
+
+function assertAvatarFile(file: FormDataEntryValue | null): asserts file is File {
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Choose an image file to upload.");
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    throw new Error("Profile picture must be 3 MB or smaller.");
+  }
+  if (!AVATAR_ACCEPT.split(",").includes(file.type)) {
+    throw new Error("Use a PNG, JPEG, or WebP image.");
+  }
+}
+
+function avatarExtension(file: File) {
+  const fromType = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".png")) return "png";
+  if (name.endsWith(".webp")) return "webp";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "jpg";
+  return fromType;
 }
 
 export async function saveDropdownOption(
@@ -289,17 +312,107 @@ export async function saveProfile(
   const { supabase, user } = context;
   try {
     const parsed = profileSchema.parse(formToObject(formData));
-    const { error } = await supabase.from("profiles").upsert({
-      id: user.id,
+    const values = {
       full_name: parsed.full_name ?? null,
       email: parsed.email ?? user.email ?? null,
       phone: parsed.phone ?? null,
       title: parsed.title ?? null,
       status: parsed.status ?? null,
-    });
-    if (error) throw new Error(error.message);
+    };
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (existing?.id) {
+      const { error } = await supabase.from("profiles").update(values).eq("id", user.id);
+      if (error) throw new Error(error.message);
+    } else {
+      // Let DB default role apply for compatibility across 0004/0006 states.
+      const { error } = await supabase.from("profiles").insert({ id: user.id, ...values });
+      if (error) throw new Error(error.message);
+    }
     revalidateSettings();
     return { ok: true, message: "Profile saved" };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function uploadProfileAvatar(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
+  try {
+    const file = formData.get("avatar");
+    assertAvatarFile(file);
+    const ext = avatarExtension(file);
+    const path = `avatars/${user.id}/profile-${Date.now()}.${ext}`;
+    const admin = createAdminClient();
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { error: uploadError } = await admin.storage.from(AVATAR_BUCKET).upload(path, bytes, {
+      contentType: file.type,
+      upsert: false,
+      cacheControl: "3600",
+    });
+    if (uploadError) throw new Error(uploadError.message);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ avatar_url: path })
+      .eq("id", user.id);
+    if (error) {
+      await admin.storage.from(AVATAR_BUCKET).remove([path]).catch(() => undefined);
+      throw new Error(error.message);
+    }
+
+    const previous = profile?.avatar_url;
+    if (previous && !/^https?:\/\//i.test(previous) && previous !== path) {
+      await admin.storage.from(AVATAR_BUCKET).remove([previous]).catch(() => undefined);
+    }
+
+    revalidateSettings();
+    return { ok: true, message: "Profile picture updated." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function removeProfileAvatar(
+  _prev: ActionState,
+  _formData: FormData,
+): Promise<ActionState> {
+  void _prev;
+  void _formData;
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ avatar_url: null })
+      .eq("id", user.id);
+    if (error) throw new Error(error.message);
+    const previous = profile?.avatar_url;
+    if (previous && !/^https?:\/\//i.test(previous)) {
+      const admin = createAdminClient();
+      await admin.storage.from(AVATAR_BUCKET).remove([previous]).catch(() => undefined);
+    }
+    revalidateSettings();
+    return { ok: true, message: "Profile picture removed." };
   } catch (error) {
     return actionError(error);
   }

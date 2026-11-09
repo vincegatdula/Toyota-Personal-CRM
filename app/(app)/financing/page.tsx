@@ -7,6 +7,7 @@ import { Pagination } from "@/components/shared/pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { FinancingBadge } from "@/components/ui/status-badge";
 import {
   Table,
@@ -16,8 +17,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAuthContext } from "@/lib/auth";
 import { listFinancing } from "@/lib/data/records";
 import { getOptions, optionLabels } from "@/lib/data/options";
+import { getProfileMap, listAssignableProfiles, profileLabel } from "@/lib/data/profiles";
 import {
   FINANCING_STATUS_FALLBACK,
   OPTION_CATEGORIES,
@@ -36,26 +39,31 @@ export default async function FinancingPage({
   searchParams: Promise<Params>;
 }) {
   const params = await searchParams;
+  const context = await getAuthContext();
+  const isAdmin = context.isAdmin;
   const filters = {
     q: one(params.q),
     status: one(params.status),
     bank: one(params.bank),
+    owner: isAdmin ? one(params.owner) : undefined,
     page: Number(one(params.page)) || 1,
   };
-  const [result, options] = await Promise.all([
+  const [result, options, owners, profileMap] = await Promise.all([
     listFinancing(filters),
     getOptions(),
+    isAdmin ? listAssignableProfiles() : Promise.resolve([]),
+    isAdmin ? getProfileMap() : Promise.resolve(new Map()),
   ]);
   const statuses = optionLabels(options, OPTION_CATEGORIES.financingStatus);
   const banks = optionLabels(options, OPTION_CATEGORIES.financingBank);
-  const hasFilters = Boolean(filters.q || filters.status || filters.bank);
+  const hasFilters = Boolean(filters.q || filters.status || filters.bank || filters.owner);
 
   return (
     <div className="page-container">
       <PageHeader
         eyebrow="CRM"
         title="Financing"
-        description={`${result.count} ${pluralize(result.count, "application")} tracked from submission to approval and release.`}
+        description={`${result.count} ${pluralize(result.count, "application")} tracked from submission to approval and release.${isAdmin ? " Admins can view all users and filter by owner." : ""}`}
         actions={
           <Button asChild size="sm">
             <Link href="/financing/new">
@@ -70,6 +78,14 @@ export default async function FinancingPage({
           defaultValue={filters.q}
           placeholder="Search application, bank, model, or prospect…"
         />
+        {isAdmin ? (
+          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+            <option value="">All owners</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>
+            ))}
+          </Select>
+        ) : null}
         <Select name="status" defaultValue={filters.status ?? ""} className="h-8 w-auto min-w-36">
           <option value="">All statuses</option>
           <option value="pending">Pending / in progress</option>
@@ -106,6 +122,7 @@ export default async function FinancingPage({
               <TableRow>
                 <TableHead>Application</TableHead>
                 <TableHead>Prospect</TableHead>
+                {isAdmin ? <TableHead>Owner</TableHead> : null}
                 <TableHead>Bank / model</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Approval</TableHead>
@@ -133,6 +150,7 @@ export default async function FinancingPage({
                       {row.lead_code}
                     </span>
                   </TableCell>
+                  {isAdmin ? <TableCell><Badge tone="neutral">{profileLabel(profileMap.get(row.owner_id), row.owner_id)}</Badge></TableCell> : null}
                   <TableCell>
                     <span className="block">{row.bank || "—"}</span>
                     <span className="block max-w-[220px] truncate text-[10px] text-muted-foreground">

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { CheckCircle2, Car, Database, KeyRound } from "lucide-react";
+import { CheckCircle2, Database, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandMark } from "@/components/shared/brand-mark";
 import { APP_NAME } from "@/lib/constants";
 import { isSupabaseConfigured } from "@/lib/utils";
 
@@ -27,12 +28,12 @@ const STEPS = [
   {
     icon: Database,
     title: "Run the migrations",
-    copy: "In the Supabase SQL editor, run these migrations in order: supabase/migrations/0001_schema.sql, supabase/migrations/0002_rls.sql, supabase/migrations/0003_seed_lists.sql, supabase/migrations/0004_security_hardening.sql.",
+    copy: "In the Supabase SQL editor, run migrations in order: 0001_schema.sql, 0002_rls.sql, 0003_seed_lists.sql, 0004_security_hardening.sql, 0005_admin_full_access.sql (if not already applied), then 0006_admin_user_avatar_and_reconciliation.sql.",
   },
   {
-    icon: Car,
-    title: "Create your account and import",
-    copy: "Restart the dev server, create the owner account, then open Import to load the Excel workbook with a preview before committing.",
+    icon: CheckCircle2,
+    title: "Configure Storage and deploy env",
+    copy: "Create the private `profile-avatars` bucket in Supabase Storage. In Vercel/local server env, set SUPABASE_SERVICE_ROLE_KEY (server-only) for admin user management and avatar operations.",
   },
 ];
 
@@ -42,9 +43,7 @@ export default function SetupPage() {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-12">
       <div className="mb-6 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Car className="h-4 w-4" />
-        </span>
+        <BrandMark className="h-8 w-8 border border-border/60" />
         <div>
           <p className="text-[13px] font-semibold">{APP_NAME}</p>
           <p className="text-[10px] text-muted-foreground">First-run setup</p>
@@ -56,7 +55,7 @@ export default function SetupPage() {
       </h1>
       <p className="mt-1 max-w-xl text-[13px] text-muted-foreground">
         {configured
-          ? "Supabase credentials are present. Create an account or sign in to start using the CRM."
+          ? "Supabase credentials are present. Sign in with the administrator account or an invited/admin-created account."
           : "This app stores everything in your own Supabase project. It cannot run until the credentials are configured."}
       </p>
 

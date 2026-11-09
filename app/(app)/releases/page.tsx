@@ -16,8 +16,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAuthContext } from "@/lib/auth";
 import { listReleases } from "@/lib/data/records";
 import { getOptions, optionLabels } from "@/lib/data/options";
+import { getProfileMap, listAssignableProfiles, profileLabel } from "@/lib/data/profiles";
 import {
   OPTION_CATEGORIES,
   TRANSACTION_FALLBACK,
@@ -36,22 +38,27 @@ export default async function ReleasesPage({
   searchParams: Promise<Params>;
 }) {
   const params = await searchParams;
+  const context = await getAuthContext();
+  const isAdmin = context.isAdmin;
   const filters = {
     q: one(params.q),
     transaction: one(params.transaction),
     bank: one(params.bank),
     from: one(params.from),
     to: one(params.to),
+    owner: isAdmin ? one(params.owner) : undefined,
     page: Number(one(params.page)) || 1,
   };
-  const [result, options] = await Promise.all([
+  const [result, options, owners, profileMap] = await Promise.all([
     listReleases(filters),
     getOptions(),
+    isAdmin ? listAssignableProfiles() : Promise.resolve([]),
+    isAdmin ? getProfileMap() : Promise.resolve(new Map()),
   ]);
   const transactions = optionLabels(options, OPTION_CATEGORIES.transactionType);
   const banks = optionLabels(options, OPTION_CATEGORIES.financingBank);
   const hasFilters = Boolean(
-    filters.q || filters.transaction || filters.bank || filters.from || filters.to,
+    filters.q || filters.transaction || filters.bank || filters.from || filters.to || filters.owner,
   );
 
   return (
@@ -59,7 +66,7 @@ export default async function ReleasesPage({
       <PageHeader
         eyebrow="CRM"
         title="Vehicle Releases"
-        description={`${result.count} ${pluralize(result.count, "release")} in the log. Releases drive sales targets and the closing ratio.`}
+        description={`${result.count} ${pluralize(result.count, "release")} in the log. Releases drive sales targets and the closing ratio.${isAdmin ? " Admins can view all users and filter by owner." : ""}`}
         actions={
           <Button asChild size="sm">
             <Link href="/releases/new">
@@ -74,6 +81,14 @@ export default async function ReleasesPage({
           defaultValue={filters.q}
           placeholder="Search release, model, bank, or prospect…"
         />
+        {isAdmin ? (
+          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+            <option value="">All owners</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>
+            ))}
+          </Select>
+        ) : null}
         <Select name="transaction" defaultValue={filters.transaction ?? ""} className="h-8 w-auto min-w-32">
           <option value="">All transactions</option>
           {(transactions.length ? transactions : TRANSACTION_FALLBACK).map((value) => (
@@ -123,6 +138,7 @@ export default async function ReleasesPage({
               <TableRow>
                 <TableHead>Release</TableHead>
                 <TableHead>Prospect</TableHead>
+                {isAdmin ? <TableHead>Owner</TableHead> : null}
                 <TableHead>Model</TableHead>
                 <TableHead>Units</TableHead>
                 <TableHead>Transaction / bank</TableHead>
@@ -150,6 +166,7 @@ export default async function ReleasesPage({
                       {row.lead_code}
                     </span>
                   </TableCell>
+                  {isAdmin ? <TableCell><Badge tone="neutral">{profileLabel(profileMap.get(row.owner_id), row.owner_id)}</Badge></TableCell> : null}
                   <TableCell className="max-w-[240px] truncate">
                     {row.model_released || "—"}
                   </TableCell>

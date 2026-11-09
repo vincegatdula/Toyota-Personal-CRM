@@ -8,6 +8,8 @@ import {
   getAllVehicleModels,
   getMonthlyTargets,
 } from "@/lib/data/options";
+import { createAvatarSignedUrl } from "@/lib/avatar";
+import { listProfilesForAdmin } from "@/lib/admin-users";
 import { currentPeriod } from "@/lib/dates";
 import type { Profile } from "@/types/database";
 
@@ -25,6 +27,16 @@ export default async function SettingsPage() {
   ]);
   const period = currentPeriod();
   const profile = (profileRes.data as Profile | null) ?? null;
+  const avatarUrl = await createAvatarSignedUrl(profile?.avatar_url, user.id);
+  const isAdmin = isCrmAdmin(profile?.role);
+  const adminProfiles = isAdmin
+    ? await Promise.all(
+        (await listProfilesForAdmin()).map(async (row) => ({
+          ...row,
+          avatar_signed_url: await createAvatarSignedUrl(row.avatar_url, row.id),
+        })),
+      )
+    : [];
 
   return (
     <div className="page-container">
@@ -36,12 +48,16 @@ export default async function SettingsPage() {
       <SettingsTabs
         profile={profile}
         email={user.email ?? ""}
+        avatarUrl={avatarUrl}
         options={options}
         models={models}
         targets={targets}
         initialYear={period.year}
         initialMonth={period.month}
-        canManageModels={isCrmAdmin(profile?.role)}
+        canManageModels={isAdmin}
+        isAdmin={isAdmin}
+        adminProfiles={adminProfiles}
+        currentUserId={user.id}
       />
     </div>
   );

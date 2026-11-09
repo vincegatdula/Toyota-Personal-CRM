@@ -2,12 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Car, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { NavItems } from "@/components/app/nav-items";
+import { BrandMark } from "@/components/shared/brand-mark";
+import { AvatarImage } from "@/components/shared/avatar-image";
 import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/constants";
 
-export function MobileNav({ name, email }: { name: string; email: string }) {
+export function MobileNav({
+  name,
+  email,
+  avatarUrl,
+  isAdmin,
+}: {
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+  isAdmin?: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -35,9 +47,7 @@ export function MobileNav({ name, email }: { name: string; email: string }) {
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Car className="h-4 w-4" />
-                </span>
+                <BrandMark className="h-8 w-8 border border-border/60" />
                 <span className="text-[13px] font-semibold">{APP_NAME}</span>
               </Link>
               <Button
@@ -49,10 +59,13 @@ export function MobileNav({ name, email }: { name: string; email: string }) {
                 <X />
               </Button>
             </div>
-            <NavItems onNavigate={() => setOpen(false)} />
-            <div className="mt-auto border-t border-border pt-3 text-[11px] text-muted-foreground">
-              <p className="truncate font-medium text-foreground">{name}</p>
-              <p className="truncate">{email}</p>
+            <NavItems isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
+            <div className="mt-auto flex items-center gap-2 border-t border-border pt-3 text-[11px] text-muted-foreground">
+              <AvatarImage name={name} avatarUrl={avatarUrl} className="h-7 w-7 text-[10px]" />
+              <div className="min-w-0">
+                <p className="truncate font-medium text-foreground">{name}</p>
+                <p className="truncate">{email}</p>
+              </div>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Car } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
+import { BrandMark } from "@/components/shared/brand-mark";
 import { APP_NAME, APP_SUBTITLE } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -26,7 +26,7 @@ export default async function LoginPage({
         />
         <div className="relative">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-[11px] tracking-wide text-white/70 uppercase">
-            <Car className="h-3.5 w-3.5 text-brand" />
+            <BrandMark className="h-5 w-5 rounded-md border border-white/10" imageClassName="p-0.5" />
             Toyota sales workspace
           </div>
           <h2 className="mt-8 max-w-md text-[34px] leading-tight font-semibold tracking-tight">
@@ -54,9 +54,7 @@ export default async function LoginPage({
 
       <div className="flex flex-col items-center justify-center px-6 py-12">
         <div className="mb-10 flex items-center gap-2 lg:hidden">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Car className="h-4 w-4" />
-          </span>
+          <BrandMark className="h-8 w-8 border border-border/60" />
           <div>
             <p className="text-[13px] font-semibold">{APP_NAME}</p>
             <p className="text-[10px] text-muted-foreground">{APP_SUBTITLE}</p>

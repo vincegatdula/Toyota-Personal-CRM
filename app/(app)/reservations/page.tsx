@@ -7,6 +7,7 @@ import { Pagination } from "@/components/shared/pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { ReservationBadge } from "@/components/ui/status-badge";
 import {
   Table,
@@ -16,8 +17,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAuthContext } from "@/lib/auth";
 import { listReservations } from "@/lib/data/records";
 import { getOptions, optionLabels } from "@/lib/data/options";
+import { getProfileMap, listAssignableProfiles, profileLabel } from "@/lib/data/profiles";
 import {
   OPTION_CATEGORIES,
   RESERVATION_STATUS_FALLBACK,
@@ -37,25 +40,30 @@ export default async function ReservationsPage({
   searchParams: Promise<Params>;
 }) {
   const params = await searchParams;
+  const context = await getAuthContext();
+  const isAdmin = context.isAdmin;
   const filters = {
     q: one(params.q),
     status: one(params.status),
     overdue: one(params.overdue),
+    owner: isAdmin ? one(params.owner) : undefined,
     page: Number(one(params.page)) || 1,
   };
-  const [result, options] = await Promise.all([
+  const [result, options, owners, profileMap] = await Promise.all([
     listReservations(filters),
     getOptions(),
+    isAdmin ? listAssignableProfiles() : Promise.resolve([]),
+    isAdmin ? getProfileMap() : Promise.resolve(new Map()),
   ]);
   const statuses = optionLabels(options, OPTION_CATEGORIES.reservationStatus);
-  const hasFilters = Boolean(filters.q || filters.status || filters.overdue);
+  const hasFilters = Boolean(filters.q || filters.status || filters.overdue || filters.owner);
 
   return (
     <div className="page-container">
       <PageHeader
         eyebrow="CRM"
         title="Reservations & Units"
-        description={`${result.count} ${pluralize(result.count, "reservation")} tracked through unit availability, documents, and release.`}
+        description={`${result.count} ${pluralize(result.count, "reservation")} tracked through unit availability, documents, and release.${isAdmin ? " Admins can view all users and filter by owner." : ""}`}
         actions={
           <Button asChild size="sm">
             <Link href="/reservations/new">
@@ -70,6 +78,14 @@ export default async function ReservationsPage({
           defaultValue={filters.q}
           placeholder="Search reservation, model, channel, or prospect…"
         />
+        {isAdmin ? (
+          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+            <option value="">All owners</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>
+            ))}
+          </Select>
+        ) : null}
         <Select name="status" defaultValue={filters.status ?? ""} className="h-8 w-auto min-w-36">
           <option value="">All statuses</option>
           {(statuses.length ? statuses : RESERVATION_STATUS_FALLBACK).map((status) => (
@@ -106,6 +122,7 @@ export default async function ReservationsPage({
               <TableRow>
                 <TableHead>Reservation</TableHead>
                 <TableHead>Prospect</TableHead>
+                {isAdmin ? <TableHead>Owner</TableHead> : null}
                 <TableHead>Model / channel</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Expected release</TableHead>
@@ -133,6 +150,7 @@ export default async function ReservationsPage({
                       {row.lead_code}
                     </span>
                   </TableCell>
+                  {isAdmin ? <TableCell><Badge tone="neutral">{profileLabel(profileMap.get(row.owner_id), row.owner_id)}</Badge></TableCell> : null}
                   <TableCell>
                     <span className="block max-w-[220px] truncate">
                       {row.reserved_model || "—"}

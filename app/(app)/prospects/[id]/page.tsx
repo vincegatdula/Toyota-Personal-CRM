@@ -32,6 +32,9 @@ import { Label } from "@/components/ui/label";
 import { ActivityForm } from "@/components/prospects/activity-form";
 import { getLeadDetail } from "@/lib/data/leads";
 import { getOptions } from "@/lib/data/options";
+import { getProfileMap, listAssignableProfiles, profileLabel } from "@/lib/data/profiles";
+import { getAuthContext } from "@/lib/auth";
+import { ReassignLeadCard } from "@/components/prospects/reassign-lead-card";
 import {
   completeFollowUp,
   setLeadArchived,
@@ -79,9 +82,12 @@ export default async function ProspectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [detail, options] = await Promise.all([
+  const context = await getAuthContext();
+  const [detail, options, owners, profileMap] = await Promise.all([
     getLeadDetail(id),
     getOptions(),
+    context.isAdmin ? listAssignableProfiles() : Promise.resolve([]),
+    context.isAdmin ? getProfileMap() : Promise.resolve(new Map()),
   ]);
   if (!detail) notFound();
   const { lead, activities, financing, reservations, releases, lostSales } = detail;
@@ -93,7 +99,7 @@ export default async function ProspectDetailPage({
       <PageHeader
         eyebrow={lead.lead_code}
         title={lead.prospect_name}
-        description={[lead.lead_source, lead.preferred_model, lead.location]
+        description={[lead.lead_source, lead.preferred_model, lead.location, context.isAdmin ? `Owner: ${profileLabel(profileMap.get(lead.owner_id), lead.owner_id)}` : null]
           .filter(Boolean)
           .join(" · ")}
         actions={
@@ -474,6 +480,9 @@ export default async function ProspectDetailPage({
             </CardContent>
           </Card>
 
+          {context.isAdmin ? (
+            <ReassignLeadCard leadId={lead.id} currentOwnerId={lead.owner_id} owners={owners} />
+          ) : null}
           <Card>
             <CardHeader className="p-3.5">
               <CardTitle>Quick actions</CardTitle>

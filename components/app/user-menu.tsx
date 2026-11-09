@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { LogOut, Settings, Shield, UserRound } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import {
   DropdownMenu,
@@ -12,16 +12,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { initials } from "@/lib/format";
+import { AvatarImage } from "@/components/shared/avatar-image";
 
-export function UserMenu({ name, email }: { name: string; email: string }) {
+export function UserMenu({
+  name,
+  email,
+  avatarUrl,
+  isAdmin,
+}: {
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+  isAdmin?: boolean;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label="Account menu">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e8e6e2] text-[10px] font-semibold text-stone-700">
-            {initials(name)}
-          </span>
+          <AvatarImage name={name} avatarUrl={avatarUrl} className="h-6 w-6 text-[10px]" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
@@ -41,6 +49,13 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
             <Settings /> Targets & settings
           </Link>
         </DropdownMenuItem>
+        {isAdmin ? (
+          <DropdownMenuItem asChild>
+            <Link href="/settings?tab=admin">
+              <Shield /> User management
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <form action={signOut}>
           <button

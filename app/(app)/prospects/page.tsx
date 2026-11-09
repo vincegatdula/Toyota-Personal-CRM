@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { PipelineBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -16,8 +17,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getAuthContext } from "@/lib/auth";
 import { listLeads } from "@/lib/data/leads";
 import { getOptions, optionLabels } from "@/lib/data/options";
+import { getProfileMap, listAssignableProfiles, profileLabel } from "@/lib/data/profiles";
 import {
   LEAD_SOURCE_FALLBACK,
   OPTION_CATEGORIES,
@@ -41,6 +44,8 @@ export default async function ProspectsPage({
   searchParams: Promise<Params>;
 }) {
   const params = await searchParams;
+  const context = await getAuthContext();
+  const isAdmin = context.isAdmin;
   const archived = one(params.archived) === "1";
   const filters = {
     q: one(params.q),
@@ -50,15 +55,18 @@ export default async function ProspectsPage({
     status: one(params.status),
     timeline: one(params.timeline),
     followUp: one(params.followUp),
+    owner: isAdmin ? one(params.owner) : undefined,
     sort: one(params.sort),
     archived: archived ? "1" : undefined,
     page: Number(one(params.page)) || 1,
     pageSize: 25,
   };
 
-  const [result, options] = await Promise.all([
+  const [result, options, owners, profileMap] = await Promise.all([
     listLeads(filters),
     getOptions(),
+    isAdmin ? listAssignableProfiles() : Promise.resolve([]),
+    isAdmin ? getProfileMap() : Promise.resolve(new Map()),
   ]);
 
   const sources = optionLabels(options, OPTION_CATEGORIES.leadSource);
@@ -71,6 +79,7 @@ export default async function ProspectsPage({
     filters.status,
     filters.followUp,
     filters.timeline,
+    filters.owner,
   ].filter(Boolean).length;
 
   return (
@@ -78,7 +87,7 @@ export default async function ProspectsPage({
       <PageHeader
         eyebrow="CRM"
         title={archived ? "Archived prospects" : "Prospects"}
-        description={`${result.count} ${pluralize(result.count, "prospect")}${activeFilters ? " matching your filters" : ""}. Keep follow-ups current and every conversation recorded.`}
+        description={`${result.count} ${pluralize(result.count, "prospect")}${activeFilters ? " matching your filters" : ""}.${isAdmin ? " Admins can view all users and filter by owner." : " Keep follow-ups current and every conversation recorded."}`}
         actions={
           <>
             <Button asChild variant="outline" size="sm">
@@ -102,6 +111,16 @@ export default async function ProspectsPage({
           defaultValue={filters.q}
           placeholder="Search name, code, number, email, or model…"
         />
+        {isAdmin ? (
+          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+            <option value="">All owners</option>
+            {owners.map((owner) => (
+              <option key={owner.id} value={owner.id}>
+                {profileLabel(owner, owner.id)}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <Select name="source" defaultValue={filters.source ?? ""} className="h-8 w-auto min-w-36">
           <option value="">All lead sources</option>
           {(sources.length ? sources : LEAD_SOURCE_FALLBACK).map((source) => (
@@ -156,6 +175,7 @@ export default async function ProspectsPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Prospect</TableHead>
+                {isAdmin ? <TableHead>Owner</TableHead> : null}
                 <TableHead>Model / transaction</TableHead>
                 <TableHead>Lead source</TableHead>
                 <TableHead>Status</TableHead>
@@ -177,6 +197,11 @@ export default async function ProspectsPage({
                       </span>
                     </Link>
                   </TableCell>
+                  {isAdmin ? (
+                    <TableCell>
+                      <Badge tone="neutral">{profileLabel(profileMap.get(lead.owner_id), lead.owner_id)}</Badge>
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     <span className="block max-w-[220px] truncate">
                       {lead.preferred_model || "—"}
