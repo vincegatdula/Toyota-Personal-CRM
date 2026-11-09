@@ -20,6 +20,17 @@ function revalidateAdmin() {
   revalidatePath("/pipeline");
 }
 
+function redactEmail(email: string) {
+  const [local = "", domain = ""] = email.split("@");
+  if (!domain) return "***";
+  const head = local.slice(0, 2);
+  return `${head}${local.length > 2 ? "***" : ""}@${domain}`;
+}
+
+function isInviteOnlyTriggerError(message: string | undefined) {
+  return Boolean(message && /registration is invite-only|sqlstate 42501|42501/i.test(message));
+}
+
 async function assertNotLastAdminDemotion(targetUserId: string, nextRole: "admin" | "user") {
   if (nextRole === "admin") return;
   const { supabase } = await requireCrmAdminContext();
@@ -43,7 +54,9 @@ export async function adminCreateUser(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireCrmAdminContext();
+  const context = await requireCrmAdminContext();
+  let createdInviteId: string | null = null;
+  const admin = createAdminClient();
   try {
     const email = n(formData.get("email"))?.toLowerCase();
     const password = n(formData.get("password"));
@@ -58,8 +71,50 @@ export async function adminCreateUser(
       throw new Error("Use a password with at least 8 characters.");
     }
 
-    const admin = createAdminClient();
-    // Trusted admin-controlled provisioning; app_metadata is service-role only.
+    // Compatibility path for invite-only signup trigger:
+    // Some Supabase Auth/Admin environments may not expose supplied app_metadata
+    // to the BEFORE INSERT trigger on auth.users as raw_app_meta_data. The
+    // trigger already supports trusted pending signup_invites, so create or
+    // reuse a pending invite for this exact email before createUser(). The
+    // trigger consumes it transactionally during auth user creation.
+    const { data: existingInvite, error: existingInviteError } = await admin
+      .from("signup_invites")
+      .select("id, role")
+      .ilike("email", email)
+      .is("consumed_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingInviteError) throw new Error(existingInviteError.message);
+
+    if (existingInvite?.id) {
+      const { error: updateInviteError } = await admin
+        .from("signup_invites")
+        .update({
+          role,
+          note: "Admin-managed account provisioning",
+          created_by: context.user.id,
+        })
+        .eq("id", existingInvite.id)
+        .is("consumed_at", null);
+      if (updateInviteError) throw new Error(updateInviteError.message);
+    } else {
+      const { data: invite, error: inviteError } = await admin
+        .from("signup_invites")
+        .insert({
+          email,
+          role,
+          note: "Admin-managed account provisioning",
+          created_by: context.user.id,
+        })
+        .select("id")
+        .single();
+      if (inviteError) throw new Error(inviteError.message);
+      createdInviteId = invite?.id ?? null;
+    }
+
+    // Trusted admin-controlled provisioning. Keep app_metadata in payload for
+    // environments where it is available to trigger/auth metadata.
     const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
@@ -67,7 +122,17 @@ export async function adminCreateUser(
       user_metadata: { full_name: fullName || null },
       app_metadata: { crm_role: role },
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("adminCreateUser: auth.admin.createUser failed", {
+        email: redactEmail(email),
+        role,
+        hasAppMetadata: true,
+        status: "status" in error ? error.status : undefined,
+        code: "code" in error ? error.code : undefined,
+        inviteOnly: isInviteOnlyTriggerError(error.message),
+      });
+      throw new Error(error.message);
+    }
     const userId = data.user?.id;
     if (!userId) throw new Error("Account was not created.");
 
@@ -93,6 +158,22 @@ export async function adminCreateUser(
     revalidateAdmin();
     return { ok: true, message: "User account created." };
   } catch (error) {
+    if (createdInviteId) {
+      try {
+        await admin
+          .from("signup_invites")
+          .delete()
+          .eq("id", createdInviteId)
+          .is("consumed_at", null);
+      } catch {
+        // best-effort cleanup only
+      }
+    }
+    if (error instanceof Error && isInviteOnlyTriggerError(error.message)) {
+      console.error("adminCreateUser: invite-only trigger rejected request", {
+        hint: "verify 0006 trigger/app_metadata visibility; pending invite fallback attempted",
+      });
+    }
     return actionError(error);
   }
 }
