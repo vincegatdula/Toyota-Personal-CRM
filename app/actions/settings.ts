@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireCrmAdmin, requireUser } from "@/lib/auth";
+import { requireCrmAdmin, requireAuthContext } from "@/lib/auth";
 import {
   dropdownOptionSchema,
   formToObject,
@@ -20,11 +20,25 @@ export async function saveDropdownOption(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   try {
     const parsed = dropdownOptionSchema.parse(formToObject(formData));
     const id = n(formData.get("id"));
     if (id) {
+      const { data: existing } = await supabase
+        .from("dropdown_options")
+        .select("id, owner_id, is_system")
+        .eq("id", id)
+        .maybeSingle();
+      if (!existing) throw new Error("List option not found.");
+      const isGlobal = existing.owner_id === null || existing.is_system;
+      if (isGlobal && !context.isAdmin) {
+        throw new Error("Only CRM administrators can manage shared list options.");
+      }
+      if (!isGlobal && existing.owner_id !== user.id && !context.isAdmin) {
+        throw new Error("You can only manage your own list options.");
+      }
       const { error } = await supabase
         .from("dropdown_options")
         .update({
@@ -34,7 +48,16 @@ export async function saveDropdownOption(
         })
         .eq("id", id);
       if (error) throw new Error(error.message);
-    } else {
+      revalidateSettings();
+      return { ok: true, message: "List option saved" };
+    }
+
+    // Creating global/shared dropdown options is admin-only.
+    if (!context.isAdmin) {
+      throw new Error("Only CRM administrators can create shared list options.");
+    }
+
+    {
       const { data: existing } = await supabase
         .from("dropdown_options")
         .select("id, is_active")
@@ -67,17 +90,21 @@ export async function saveDropdownOption(
 }
 
 export async function moveDropdownOption(formData: FormData) {
-  const { supabase } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   const direction = n(formData.get("direction"));
   if (!id || !direction) return;
 
   const { data: current } = await supabase
     .from("dropdown_options")
-    .select("id, category")
+    .select("id, category, owner_id, is_system")
     .eq("id", id)
     .maybeSingle();
   if (!current) return;
+  const isGlobal = current.owner_id === null || current.is_system;
+  if (isGlobal && !context.isAdmin) return;
+  if (!isGlobal && current.owner_id !== user.id && !context.isAdmin) return;
 
   const { data: rows } = await supabase
     .from("dropdown_options")
@@ -104,10 +131,20 @@ export async function moveDropdownOption(formData: FormData) {
 }
 
 export async function toggleDropdownOption(formData: FormData) {
-  const { supabase } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   const active = bool(formData.get("is_active"));
   if (!id) return;
+  const { data: existing } = await supabase
+    .from("dropdown_options")
+    .select("id, owner_id, is_system")
+    .eq("id", id)
+    .maybeSingle();
+  if (!existing) return;
+  const isGlobal = existing.owner_id === null || existing.is_system;
+  if (isGlobal && !context.isAdmin) return;
+  if (!isGlobal && existing.owner_id !== user.id && !context.isAdmin) return;
   await supabase
     .from("dropdown_options")
     .update({ is_active: active })
@@ -116,15 +153,20 @@ export async function toggleDropdownOption(formData: FormData) {
 }
 
 export async function deleteDropdownOption(formData: FormData) {
-  const { supabase } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   if (!id) return;
   const { data } = await supabase
     .from("dropdown_options")
-    .select("is_system")
+    .select("id, owner_id, is_system")
     .eq("id", id)
     .maybeSingle();
-  if (data?.is_system) {
+  if (!data) return;
+  const isGlobal = data.owner_id === null || data.is_system;
+  if (isGlobal && !context.isAdmin) return;
+  if (!isGlobal && data.owner_id !== user.id && !context.isAdmin) return;
+  if (data.is_system) {
     await supabase
       .from("dropdown_options")
       .update({ is_active: false })
@@ -197,7 +239,8 @@ export async function saveTarget(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   try {
     const parsed = targetSchema.parse(formToObject(formData));
     const { data: existing } = await supabase
@@ -242,7 +285,8 @@ export async function saveProfile(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   try {
     const parsed = profileSchema.parse(formToObject(formData));
     const { error } = await supabase.from("profiles").upsert({

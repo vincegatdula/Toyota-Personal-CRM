@@ -2,11 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireAuthContext } from "@/lib/auth";
 import { formToObject, lostSaleSchema } from "@/lib/validation";
 import { actionError, n, type ActionState } from "@/lib/actions-helpers";
 import { manilaTimestamp, todayISO } from "@/lib/dates";
-import { assertLeadOwned } from "@/lib/lead-guard";
 
 function revalidateLost(leadId?: string) {
   revalidatePath("/lost-sales");
@@ -21,12 +20,19 @@ export async function saveLostSale(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   let redirectTo: string | null = null;
   try {
     const parsed = lostSaleSchema.parse(formToObject(formData));
     const id = n(formData.get("id"));
-    await assertLeadOwned(supabase, user.id, parsed.lead_id);
+    let leadQuery = supabase
+      .from("leads")
+      .select("id, owner_id")
+      .eq("id", parsed.lead_id);
+    if (!context.isAdmin) leadQuery = leadQuery.eq("owner_id", user.id);
+    const { data: lead } = await leadQuery.maybeSingle();
+    if (!lead) throw new Error("That prospect does not exist in your account.");
     const values = {
       lead_id: parsed.lead_id,
       date_marked_lost: parsed.date_marked_lost,
@@ -44,28 +50,32 @@ export async function saveLostSale(
     };
 
     if (id) {
-      const { error } = await supabase
+      let updateQuery = supabase
         .from("lost_sales")
         .update(values)
-        .eq("id", id)
-        .eq("owner_id", user.id);
+        .eq("id", id);
+      if (!context.isAdmin) updateQuery = updateQuery.eq("owner_id", user.id);
+      const { error } = await updateQuery;
       if (error) throw new Error(error.message);
     } else {
       const { error } = await supabase
         .from("lost_sales")
-        .insert({ ...values, owner_id: user.id });
+        .insert({ ...values, owner_id: lead.owner_id });
       if (error) throw new Error(error.message);
-      await supabase
-        .from("leads")
-        .update({
-          pipeline_status: "Lost",
-          lost_at: manilaTimestamp(`${parsed.date_marked_lost}T12:00`),
-        })
-        .eq("id", parsed.lead_id)
-        .eq("owner_id", user.id);
+      {
+        let leadUpdate = supabase
+          .from("leads")
+          .update({
+            pipeline_status: "Lost",
+            lost_at: manilaTimestamp(`${parsed.date_marked_lost}T12:00`),
+          })
+          .eq("id", parsed.lead_id);
+        if (!context.isAdmin) leadUpdate = leadUpdate.eq("owner_id", user.id);
+        await leadUpdate;
+      }
       await supabase.from("lead_activities").insert({
         lead_id: parsed.lead_id,
-        owner_id: user.id,
+        owner_id: lead.owner_id,
         activity_type: "Status change",
         activity_at: new Date().toISOString(),
         summary: `Marked lost: ${parsed.primary_loss_reason}${parsed.recoverable ? " (recoverable)" : ""}`,
@@ -82,42 +92,49 @@ export async function saveLostSale(
 }
 
 export async function updateLostRecovery(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   const status = n(formData.get("recovery_status"));
   if (!id || !status) return;
   if (!["open", "recovered", "closed"].includes(status)) return;
 
-  const { data: record } = await supabase
+  let recordQuery = supabase
     .from("lost_sales")
-    .select("lead_id")
-    .eq("id", id)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+    .select("lead_id, owner_id")
+    .eq("id", id);
+  if (!context.isAdmin) recordQuery = recordQuery.eq("owner_id", user.id);
+  const { data: record } = await recordQuery.maybeSingle();
   if (!record) return;
 
-  await supabase
-    .from("lost_sales")
-    .update({
-      recovery_status: status as "open" | "recovered" | "closed",
-      recovered_at: status === "recovered" ? todayISO() : null,
-    })
-    .eq("id", id)
-    .eq("owner_id", user.id);
+  {
+    let lostUpdate = supabase
+      .from("lost_sales")
+      .update({
+        recovery_status: status as "open" | "recovered" | "closed",
+        recovered_at: status === "recovered" ? todayISO() : null,
+      })
+      .eq("id", id);
+    if (!context.isAdmin) lostUpdate = lostUpdate.eq("owner_id", user.id);
+    await lostUpdate;
+  }
 
   if (status === "recovered") {
-    await supabase
-      .from("leads")
-      .update({
-        lost_at: null,
-        pipeline_status: "Contacted",
-        last_contact_date: todayISO(),
-      })
-      .eq("id", record.lead_id)
-      .eq("owner_id", user.id);
+    {
+      let leadUpdate = supabase
+        .from("leads")
+        .update({
+          lost_at: null,
+          pipeline_status: "Contacted",
+          last_contact_date: todayISO(),
+        })
+        .eq("id", record.lead_id);
+      if (!context.isAdmin) leadUpdate = leadUpdate.eq("owner_id", user.id);
+      await leadUpdate;
+    }
     await supabase.from("lead_activities").insert({
       lead_id: record.lead_id,
-      owner_id: user.id,
+      owner_id: record.owner_id,
       activity_type: "Note",
       activity_at: new Date().toISOString(),
       summary: "Lost sale marked recovered; prospect returned to Contacted",
@@ -129,14 +146,18 @@ export async function updateLostRecovery(formData: FormData) {
 }
 
 export async function deleteLostSale(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   if (!id) return;
-  await supabase
-    .from("lost_sales")
-    .delete()
-    .eq("id", id)
-    .eq("owner_id", user.id);
+  {
+    let deleteQuery = supabase
+      .from("lost_sales")
+      .delete()
+      .eq("id", id);
+    if (!context.isAdmin) deleteQuery = deleteQuery.eq("owner_id", user.id);
+    await deleteQuery;
+  }
   revalidateLost();
   redirect("/lost-sales");
 }

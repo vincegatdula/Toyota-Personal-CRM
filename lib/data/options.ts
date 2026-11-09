@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { getSession } from "@/lib/auth";
+import { getAuthContext, getSession } from "@/lib/auth";
 import { currentPeriod } from "@/lib/dates";
 import type {
   DropdownOption,
@@ -62,18 +62,20 @@ export async function getTargetsFor(
   year: number,
   month: number,
 ): Promise<{ sales: number; financing: number; tfs: number; source: string }> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return { sales: 0, financing: 0, tfs: 0, source: "none" };
 
-  const { data } = await supabase
+  let query = supabase
     .from("monthly_targets")
     .select("*")
     .eq("year", year)
-    .eq("month", month)
-    .or(`owner_id.eq.${user.id},owner_id.is.null`);
+    .eq("month", month);
+  if (!context.isAdmin) query = query.or(`owner_id.eq.${user.id},owner_id.is.null`);
 
+  const { data } = await query;
   const rows = data ?? [];
-  const own = rows.find((row) => row.owner_id === user.id);
+  const own = user && !context.isAdmin ? rows.find((row) => row.owner_id === user.id) : undefined;
   const global = rows.find((row) => row.owner_id === null);
   const chosen = own ?? global;
   if (!chosen) return { sales: 0, financing: 0, tfs: 0, source: "none" };
@@ -91,7 +93,7 @@ export async function getTargetYears(): Promise<number[]> {
     .from("monthly_targets")
     .select("year")
     .order("year", { ascending: false });
-  const years = new Set<number>((data ?? []).map((row) => row.year));
+  const years = new Set<number>((data ?? []).map((row: { year: number }) => row.year));
   years.add(currentPeriod().year);
   return [...years].sort((a, b) => b - a);
 }
@@ -108,14 +110,17 @@ export const getAllVehicleModels = cache(async (): Promise<VehicleModel[]> => {
 });
 
 export async function getMonthlyTargets(): Promise<MonthlyTarget[]> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return [];
-  const { data, error } = await supabase
+  let query = supabase
     .from("monthly_targets")
-    .select("*")
-    .or(`owner_id.eq.${user.id},owner_id.is.null`)
+    .select("*");
+  if (!context.isAdmin) query = query.or(`owner_id.eq.${user.id},owner_id.is.null`);
+  query = query
     .order("year", { ascending: false })
     .order("month", { ascending: false });
+  const { data, error } = await query;
   if (error) throw new Error(`Could not load targets: ${error.message}`);
   return data ?? [];
 }

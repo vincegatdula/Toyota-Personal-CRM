@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import type {
   FinancingApplication,
@@ -47,34 +47,35 @@ function clean(value: string) {
 }
 
 async function leadMatchingIds(
-  supabase: Awaited<ReturnType<typeof getSession>>["supabase"],
-  ownerId: string,
+  supabase: Awaited<ReturnType<typeof getAuthContext>>["supabase"],
+  ownerId: string | null,
   q: string,
 ): Promise<string[]> {
   const term = `%${clean(q)}%`;
-  const { data } = await supabase
+  let query = supabase
     .from("leads")
     .select("id")
-    .eq("owner_id", ownerId)
     .or(
       `prospect_name.ilike.${term},lead_code.ilike.${term},contact_number.ilike.${term}`,
-    )
-    .limit(200);
+    );
+  if (ownerId) query = query.eq("owner_id", ownerId);
+  const { data } = await query.limit(200);
   return (data ?? []).map((row) => row.id);
 }
 
 async function nameMap(
-  supabase: Awaited<ReturnType<typeof getSession>>["supabase"],
-  ownerId: string,
+  supabase: Awaited<ReturnType<typeof getAuthContext>>["supabase"],
+  ownerId: string | null,
   leadIds: string[],
 ): Promise<Map<string, LeadName>> {
   const ids = [...new Set(leadIds.filter(Boolean))];
   if (!ids.length) return new Map();
-  const { data } = await supabase
+  let query = supabase
     .from("leads")
     .select("id, prospect_name, lead_code")
-    .eq("owner_id", ownerId)
     .in("id", ids);
+  if (ownerId) query = query.eq("owner_id", ownerId);
+  const { data } = await query;
   return new Map(
     (data ?? []).map((row) => [
       row.id,
@@ -88,18 +89,23 @@ export type FinancingRow = FinancingApplication & WithLead;
 export async function listFinancing(
   filters: PagedFilters,
 ): Promise<PagedRows<FinancingRow>> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   const { page, pageSize, from, to } = paging(filters);
   if (!user) return { rows: [], count: 0, page, pageSize };
 
   let query = supabase
     .from("financing_applications")
-    .select("*", { count: "exact" })
-    .eq("owner_id", user.id);
+    .select("*", { count: "exact" });
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;
-    const ids = await leadMatchingIds(supabase, user.id, filters.q);
+    const ids = await leadMatchingIds(
+      supabase,
+      context.isAdmin ? null : user.id,
+      filters.q,
+    );
     const clause = `financing_code.ilike.${term},bank.ilike.${term},preferred_model.ilike.${term}`;
     query = ids.length ? query.or(`${clause},lead_id.in.(${ids.join(",")})`) : query.or(clause);
   }
@@ -125,7 +131,7 @@ export async function listFinancing(
 
   const names = await nameMap(
     supabase,
-    user.id,
+    context.isAdmin ? null : user.id,
     (data ?? []).map((row) => row.lead_id),
   );
   const rows = (data ?? []).map((row) => ({
@@ -136,14 +142,15 @@ export async function listFinancing(
 }
 
 export async function getFinancing(id: string) {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return null;
-  const { data } = await supabase
+  let query = supabase
     .from("financing_applications")
-    .select("*")
-    .eq("id", id)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+    .select("*");
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  query = query.eq("id", id);
+  const { data } = await query.maybeSingle();
   return data ?? null;
 }
 
@@ -152,18 +159,23 @@ export type ReservationRow = Reservation & WithLead;
 export async function listReservations(
   filters: PagedFilters,
 ): Promise<PagedRows<ReservationRow>> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   const { page, pageSize, from, to } = paging(filters);
   if (!user) return { rows: [], count: 0, page, pageSize };
 
   let query = supabase
     .from("reservations")
-    .select("*", { count: "exact" })
-    .eq("owner_id", user.id);
+    .select("*", { count: "exact" });
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;
-    const ids = await leadMatchingIds(supabase, user.id, filters.q);
+    const ids = await leadMatchingIds(
+      supabase,
+      context.isAdmin ? null : user.id,
+      filters.q,
+    );
     const clause = `reservation_code.ilike.${term},reserved_model.ilike.${term},sales_channel.ilike.${term}`;
     query = ids.length ? query.or(`${clause},lead_id.in.(${ids.join(",")})`) : query.or(clause);
   }
@@ -184,7 +196,7 @@ export async function listReservations(
 
   const names = await nameMap(
     supabase,
-    user.id,
+    context.isAdmin ? null : user.id,
     (data ?? []).map((row) => row.lead_id),
   );
   const rows = (data ?? []).map((row) => ({
@@ -195,27 +207,30 @@ export async function listReservations(
 }
 
 export async function getReservation(id: string) {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return null;
-  const { data } = await supabase
+  let query = supabase
     .from("reservations")
-    .select("*")
-    .eq("id", id)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+    .select("*");
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  query = query.eq("id", id);
+  const { data } = await query.maybeSingle();
   return data ?? null;
 }
 
 export async function getReservationPicker(): Promise<
   Pick<Reservation, "id" | "reservation_code" | "lead_id" | "reserved_model" | "current_status">[]
 > {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return [];
-  const { data } = await supabase
+  let query = supabase
     .from("reservations")
     .select("id, reservation_code, lead_id, reserved_model, current_status")
-    .eq("owner_id", user.id)
     .order("reservation_date", { ascending: false });
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  const { data } = await query;
   return data ?? [];
 }
 
@@ -224,18 +239,23 @@ export type ReleaseRow = VehicleRelease & WithLead;
 export async function listReleases(
   filters: PagedFilters,
 ): Promise<PagedRows<ReleaseRow>> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   const { page, pageSize, from, to } = paging(filters);
   if (!user) return { rows: [], count: 0, page, pageSize };
 
   let query = supabase
     .from("vehicle_releases")
-    .select("*", { count: "exact" })
-    .eq("owner_id", user.id);
+    .select("*", { count: "exact" });
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;
-    const ids = await leadMatchingIds(supabase, user.id, filters.q);
+    const ids = await leadMatchingIds(
+      supabase,
+      context.isAdmin ? null : user.id,
+      filters.q,
+    );
     const clause = `release_code.ilike.${term},model_released.ilike.${term},bank.ilike.${term}`;
     query = ids.length ? query.or(`${clause},lead_id.in.(${ids.join(",")})`) : query.or(clause);
   }
@@ -252,7 +272,7 @@ export async function listReleases(
 
   const names = await nameMap(
     supabase,
-    user.id,
+    context.isAdmin ? null : user.id,
     (data ?? []).map((row) => row.lead_id),
   );
   const rows = (data ?? []).map((row) => ({
@@ -263,14 +283,15 @@ export async function listReleases(
 }
 
 export async function getRelease(id: string) {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return null;
-  const { data } = await supabase
+  let query = supabase
     .from("vehicle_releases")
-    .select("*")
-    .eq("id", id)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+    .select("*");
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  query = query.eq("id", id);
+  const { data } = await query.maybeSingle();
   return data ?? null;
 }
 
@@ -279,18 +300,23 @@ export type LostRow = LostSale & WithLead;
 export async function listLostSales(
   filters: PagedFilters,
 ): Promise<PagedRows<LostRow>> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   const { page, pageSize, from, to } = paging(filters);
   if (!user) return { rows: [], count: 0, page, pageSize };
 
   let query = supabase
     .from("lost_sales")
-    .select("*", { count: "exact" })
-    .eq("owner_id", user.id);
+    .select("*", { count: "exact" });
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
 
   if (filters.q) {
     const term = `%${clean(filters.q)}%`;
-    const ids = await leadMatchingIds(supabase, user.id, filters.q);
+    const ids = await leadMatchingIds(
+      supabase,
+      context.isAdmin ? null : user.id,
+      filters.q,
+    );
     const clause = `lost_code.ilike.${term},primary_loss_reason.ilike.${term},competitor_alternative.ilike.${term}`;
     query = ids.length ? query.or(`${clause},lead_id.in.(${ids.join(",")})`) : query.or(clause);
   }
@@ -311,7 +337,7 @@ export async function listLostSales(
 
   const names = await nameMap(
     supabase,
-    user.id,
+    context.isAdmin ? null : user.id,
     (data ?? []).map((row) => row.lead_id),
   );
   const rows = (data ?? []).map((row) => ({
@@ -322,14 +348,15 @@ export async function listLostSales(
 }
 
 export async function getLostSale(id: string) {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return null;
-  const { data } = await supabase
+  let query = supabase
     .from("lost_sales")
-    .select("*")
-    .eq("id", id)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+    .select("*");
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  query = query.eq("id", id);
+  const { data } = await query.maybeSingle();
   return data ?? null;
 }
 

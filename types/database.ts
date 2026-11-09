@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type CrmRole = "owner" | "admin" | "agent" | "viewer";
+export type CrmRole = "owner" | "admin" | "user" | "agent" | "viewer";
 
 export interface Profile {
   id: string;

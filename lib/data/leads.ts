@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { todayISO, toISODate } from "@/lib/dates";
 import type {
   FinancingApplication,
@@ -65,15 +65,16 @@ function timelineRange(timeline: string | undefined) {
 }
 
 export async function listLeads(filters: LeadFilters): Promise<LeadListResult> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   const page = Math.max(1, filters.page || 1);
   const pageSize = Math.min(100, Math.max(10, filters.pageSize || 25));
   if (!user) return { rows: [], count: 0, page, pageSize };
 
   let query = supabase
     .from("leads")
-    .select("*", { count: "exact" })
-    .eq("owner_id", user.id);
+    .select("*", { count: "exact" });
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
 
   query = filters.archived === "1"
     ? query.eq("is_archived", true)
@@ -154,10 +155,12 @@ export interface LeadDetail {
 export async function getLeadDetail(
   idOrCode: string,
 ): Promise<LeadDetail | null> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return null;
 
-  let query = supabase.from("leads").select("*").eq("owner_id", user.id);
+  let query = supabase.from("leads").select("*");
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
   query = UUID_RE.test(idOrCode)
     ? query.eq("id", idOrCode)
     : query.eq("lead_code", idOrCode);
@@ -165,38 +168,39 @@ export async function getLeadDetail(
   if (error) throw new Error(`Could not load prospect: ${error.message}`);
   if (!lead) return null;
 
+  const activitiesQuery = () => {
+    let query = supabase.from("lead_activities").select("*").eq("lead_id", lead.id);
+    if (!context.isAdmin) query = query.eq("owner_id", user.id);
+    return query.order("activity_at", { ascending: false });
+  };
+  const financingQuery = () => {
+    let query = supabase.from("financing_applications").select("*").eq("lead_id", lead.id);
+    if (!context.isAdmin) query = query.eq("owner_id", user.id);
+    return query.order("created_at", { ascending: false });
+  };
+  const reservationsQuery = () => {
+    let query = supabase.from("reservations").select("*").eq("lead_id", lead.id);
+    if (!context.isAdmin) query = query.eq("owner_id", user.id);
+    return query.order("reservation_date", { ascending: false });
+  };
+  const releasesQuery = () => {
+    let query = supabase.from("vehicle_releases").select("*").eq("lead_id", lead.id);
+    if (!context.isAdmin) query = query.eq("owner_id", user.id);
+    return query.order("release_date", { ascending: false });
+  };
+  const lostSalesQuery = () => {
+    let query = supabase.from("lost_sales").select("*").eq("lead_id", lead.id);
+    if (!context.isAdmin) query = query.eq("owner_id", user.id);
+    return query.order("date_marked_lost", { ascending: false });
+  };
+
   const [activities, financing, reservations, releases, lostSales] =
     await Promise.all([
-      supabase
-        .from("lead_activities")
-        .select("*")
-        .eq("lead_id", lead.id)
-        .eq("owner_id", user.id)
-        .order("activity_at", { ascending: false }),
-      supabase
-        .from("financing_applications")
-        .select("*")
-        .eq("lead_id", lead.id)
-        .eq("owner_id", user.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("reservations")
-        .select("*")
-        .eq("lead_id", lead.id)
-        .eq("owner_id", user.id)
-        .order("reservation_date", { ascending: false }),
-      supabase
-        .from("vehicle_releases")
-        .select("*")
-        .eq("lead_id", lead.id)
-        .eq("owner_id", user.id)
-        .order("release_date", { ascending: false }),
-      supabase
-        .from("lost_sales")
-        .select("*")
-        .eq("lead_id", lead.id)
-        .eq("owner_id", user.id)
-        .order("date_marked_lost", { ascending: false }),
+      activitiesQuery(),
+      financingQuery(),
+      reservationsQuery(),
+      releasesQuery(),
+      lostSalesQuery(),
     ]);
 
   return {
@@ -210,12 +214,12 @@ export async function getLeadDetail(
 }
 
 export async function getPipelineLeads(): Promise<Lead[]> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return [];
-  const { data, error } = await supabase
+  let query = supabase
     .from("leads")
     .select("*")
-    .eq("owner_id", user.id)
     .eq("is_archived", false)
     .in("pipeline_status", [
       "New Prospect",
@@ -227,9 +231,12 @@ export async function getPipelineLeads(): Promise<Lead[]> {
       "Approved",
       "Reserved",
       "Pending Unit",
-    ])
+    ]);
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  query = query
     .order("next_action_due_date", { ascending: true, nullsFirst: false })
     .order("date_created", { ascending: false });
+  const { data, error } = await query;
   if (error) throw new Error(`Could not load the pipeline: ${error.message}`);
   return data ?? [];
 }
@@ -244,14 +251,16 @@ export interface LeadPickerItem {
 }
 
 export async function getLeadPicker(): Promise<LeadPickerItem[]> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return [];
-  const { data } = await supabase
+  let query = supabase
     .from("leads")
     .select("id, lead_code, prospect_name, preferred_model, lead_source, pipeline_status")
-    .eq("owner_id", user.id)
     .eq("is_archived", false)
     .order("prospect_name", { ascending: true });
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  const { data } = await query;
   return data ?? [];
 }
 
@@ -262,43 +271,37 @@ export interface FollowUpBucket {
 }
 
 export async function getFollowUps(): Promise<FollowUpBucket> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) return { overdue: [], dueToday: [], upcoming: [] };
   const today = todayISO();
   const inSeven = new Date(`${today}T00:00:00`);
   inSeven.setDate(inSeven.getDate() + 7);
   const upcomingTo = toISODate(inSeven);
 
-  const base = supabase
-    .from("leads")
-    .select("*")
-    .eq("owner_id", user.id)
-    .eq("is_archived", false)
-    .not("next_action_due_date", "is", null)
-    .is("next_action_completed_at", null);
+  const base = () => {
+    let query = supabase
+      .from("leads")
+      .select("*")
+      .eq("is_archived", false)
+      .not("next_action_due_date", "is", null)
+      .is("next_action_completed_at", null);
+    if (!context.isAdmin) query = query.eq("owner_id", user.id);
+    return query;
+  };
 
   const [overdue, dueToday, upcoming] = await Promise.all([
-    base
+    base()
       .lt("next_action_due_date", today)
       .order("next_action_due_date", { ascending: true })
       .limit(50),
-    supabase
-      .from("leads")
-      .select("*")
-      .eq("owner_id", user.id)
-      .eq("is_archived", false)
+    base()
       .eq("next_action_due_date", today)
-      .is("next_action_completed_at", null)
       .order("prospect_name", { ascending: true })
       .limit(50),
-    supabase
-      .from("leads")
-      .select("*")
-      .eq("owner_id", user.id)
-      .eq("is_archived", false)
+    base()
       .gt("next_action_due_date", today)
       .lte("next_action_due_date", upcomingTo)
-      .is("next_action_completed_at", null)
       .order("next_action_due_date", { ascending: true })
       .limit(50),
   ]);

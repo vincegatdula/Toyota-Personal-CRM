@@ -2,11 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireAuthContext } from "@/lib/auth";
 import { activitySchema, formToObject, leadSchema } from "@/lib/validation";
 import { actionError, n, type ActionState } from "@/lib/actions-helpers";
 import { manilaTimestamp, toDateOnly, todayISO } from "@/lib/dates";
-import { assertLeadOwned } from "@/lib/lead-guard";
 
 function revalidateLeadPaths(id?: string) {
   revalidatePath("/dashboard");
@@ -20,7 +19,8 @@ export async function saveLead(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   let redirectTo: string | null = null;
   try {
     const payload = formToObject(formData);
@@ -50,13 +50,13 @@ export async function saveLead(
     };
 
     if (id) {
-      const { data: before } = await supabase
+      let beforeQuery = supabase
         .from("leads")
         .select("pipeline_status")
-        .eq("id", id)
-        .eq("owner_id", user.id)
-        .maybeSingle();
-      const { error } = await supabase
+        .eq("id", id);
+      if (!context.isAdmin) beforeQuery = beforeQuery.eq("owner_id", user.id);
+      const { data: before } = await beforeQuery.maybeSingle();
+      let updateQuery = supabase
         .from("leads")
         .update(
           before &&
@@ -64,14 +64,19 @@ export async function saveLead(
             parsed.pipeline_status !== "Lost"
             ? { ...values, lost_at: null }
             : values,
-        )
-        .eq("id", id)
-        .eq("owner_id", user.id);
+        );
+      if (!context.isAdmin) updateQuery = updateQuery.eq("owner_id", user.id);
+      const { error } = await updateQuery.eq("id", id);
       if (error) throw new Error(error.message);
       if (before && before.pipeline_status !== parsed.pipeline_status) {
+        const { data: ownerLead } = await supabase
+          .from("leads")
+          .select("owner_id")
+          .eq("id", id)
+          .maybeSingle();
         await supabase.from("lead_activities").insert({
           lead_id: id,
-          owner_id: user.id,
+          owner_id: ownerLead?.owner_id ?? user.id,
           activity_type: "Status change",
           activity_at: new Date().toISOString(),
           summary: `Status changed from ${before.pipeline_status} to ${parsed.pipeline_status}`,
@@ -109,15 +114,17 @@ export async function saveLead(
 }
 
 export async function setLeadArchived(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   const archived = formData.get("archived") === "1";
   if (!id) return;
-  await supabase
+  let query = supabase
     .from("leads")
     .update({ is_archived: archived })
-    .eq("id", id)
-    .eq("owner_id", user.id);
+    .eq("id", id);
+  if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  await query;
   revalidateLeadPaths(id);
   redirect(archived ? "/prospects?archived=1" : "/prospects");
 }
@@ -126,13 +133,20 @@ export async function addActivity(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   try {
     const parsed = activitySchema.parse(formToObject(formData));
-    await assertLeadOwned(supabase, user.id, parsed.lead_id);
+    let leadQuery = supabase
+      .from("leads")
+      .select("id, owner_id")
+      .eq("id", parsed.lead_id);
+    if (!context.isAdmin) leadQuery = leadQuery.eq("owner_id", user.id);
+    const { data: lead } = await leadQuery.maybeSingle();
+    if (!lead) throw new Error("That prospect does not exist in your account.");
     const { error } = await supabase.from("lead_activities").insert({
       lead_id: parsed.lead_id,
-      owner_id: user.id,
+      owner_id: lead.owner_id,
       activity_type: parsed.activity_type,
       activity_at: manilaTimestamp(parsed.activity_at),
       summary: parsed.summary ?? null,
@@ -141,13 +155,16 @@ export async function addActivity(
       created_by: user.id,
     });
     if (error) throw new Error(error.message);
-    await supabase
-      .from("leads")
-      .update({
-        last_contact_date: toDateOnly(parsed.activity_at),
-      })
-      .eq("id", parsed.lead_id)
-      .eq("owner_id", user.id);
+    {
+      let leadUpdate = supabase
+        .from("leads")
+        .update({
+          last_contact_date: toDateOnly(parsed.activity_at),
+        })
+        .eq("id", parsed.lead_id);
+      if (!context.isAdmin) leadUpdate = leadUpdate.eq("owner_id", user.id);
+      await leadUpdate;
+    }
     revalidateLeadPaths(parsed.lead_id);
     return { ok: true, message: "Activity recorded" };
   } catch (error) {
@@ -156,25 +173,26 @@ export async function addActivity(
 }
 
 export async function completeFollowUp(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   if (!id) return;
-  const { data: lead } = await supabase
+  let leadQuery = supabase
     .from("leads")
-    .select("id")
-    .eq("id", id)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+    .select("id, owner_id")
+    .eq("id", id);
+  if (!context.isAdmin) leadQuery = leadQuery.eq("owner_id", user.id);
+  const { data: lead } = await leadQuery.maybeSingle();
   if (!lead) return;
   const now = new Date().toISOString();
-  await supabase
+  let updateQuery = supabase
     .from("leads")
-    .update({ next_action_completed_at: now, last_contact_date: todayISO() })
-    .eq("id", id)
-    .eq("owner_id", user.id);
+    .update({ next_action_completed_at: now, last_contact_date: todayISO() });
+  if (!context.isAdmin) updateQuery = updateQuery.eq("owner_id", user.id);
+  await updateQuery.eq("id", id);
   await supabase.from("lead_activities").insert({
     lead_id: id,
-    owner_id: user.id,
+    owner_id: lead.owner_id,
     activity_type: "Follow-up attempt",
     activity_at: now,
     summary: "Follow-up marked complete",
@@ -184,31 +202,32 @@ export async function completeFollowUp(formData: FormData) {
 }
 
 export async function updateLeadStatus(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   const status = n(formData.get("status"));
   if (!id || !status) return;
 
-  const { data: before } = await supabase
+  let beforeQuery = supabase
     .from("leads")
-    .select("pipeline_status")
-    .eq("id", id)
-    .eq("owner_id", user.id)
-    .maybeSingle();
+    .select("pipeline_status, owner_id")
+    .eq("id", id);
+  if (!context.isAdmin) beforeQuery = beforeQuery.eq("owner_id", user.id);
+  const { data: before } = await beforeQuery.maybeSingle();
   if (!before || before.pipeline_status === status) return;
 
-  await supabase
+  let updateQuery = supabase
     .from("leads")
     .update({
       pipeline_status: status,
       lost_at: status === "Lost" ? new Date().toISOString() : null,
-    })
-    .eq("id", id)
-    .eq("owner_id", user.id);
+    });
+  if (!context.isAdmin) updateQuery = updateQuery.eq("owner_id", user.id);
+  await updateQuery.eq("id", id);
 
   await supabase.from("lead_activities").insert({
     lead_id: id,
-    owner_id: user.id,
+    owner_id: before.owner_id,
     activity_type: "Status change",
     activity_at: new Date().toISOString(),
     summary: `Status changed from ${before.pipeline_status} to ${status}`,
@@ -219,17 +238,18 @@ export async function updateLeadStatus(formData: FormData) {
 }
 
 export async function updateNextAction(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const context = await requireAuthContext();
+  const { supabase, user } = context;
   const id = n(formData.get("id"));
   if (!id) return;
-  await supabase
+  let updateQuery = supabase
     .from("leads")
     .update({
       next_action: n(formData.get("next_action")),
       next_action_due_date: n(formData.get("next_action_due_date")),
       next_action_completed_at: null,
-    })
-    .eq("id", id)
-    .eq("owner_id", user.id);
+    });
+  if (!context.isAdmin) updateQuery = updateQuery.eq("owner_id", user.id);
+  await updateQuery.eq("id", id);
   revalidateLeadPaths(id);
 }

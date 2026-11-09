@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import * as XLSX from "xlsx";
-import { getSession } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data/dashboard";
 import { normalizePeriod, toISODate } from "@/lib/dates";
 
@@ -30,7 +30,8 @@ function setWidths(ws: XLSX.WorkSheet, widths: number[]) {
 }
 
 export async function GET(request: NextRequest) {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
@@ -55,41 +56,56 @@ export async function GET(request: NextRequest) {
     lostRes,
     dashboard,
   ] = await Promise.all([
-    supabase
-      .from("leads")
-      .select("*")
-      .eq("owner_id", user.id)
-      .gte("date_created", start)
-      .lte("date_created", end)
-      .order("date_created", { ascending: true }),
-    supabase
-      .from("financing_applications")
-      .select("*")
-      .eq("owner_id", user.id)
-      .gte("date_submitted", start)
-      .lte("date_submitted", end)
-      .order("date_submitted", { ascending: true }),
-    supabase
-      .from("reservations")
-      .select("*")
-      .eq("owner_id", user.id)
-      .gte("reservation_date", start)
-      .lte("reservation_date", end)
-      .order("reservation_date", { ascending: true }),
-    supabase
-      .from("vehicle_releases")
-      .select("*")
-      .eq("owner_id", user.id)
-      .gte("release_date", start)
-      .lte("release_date", end)
-      .order("release_date", { ascending: true }),
-    supabase
-      .from("lost_sales")
-      .select("*")
-      .eq("owner_id", user.id)
-      .gte("date_marked_lost", start)
-      .lte("date_marked_lost", end)
-      .order("date_marked_lost", { ascending: true }),
+    (() => {
+      let query = supabase
+        .from("leads")
+        .select("*");
+      if (!context.isAdmin) query = query.eq("owner_id", user.id);
+      return query
+        .gte("date_created", start)
+        .lte("date_created", end)
+        .order("date_created", { ascending: true });
+    })(),
+    (() => {
+      let query = supabase
+        .from("financing_applications")
+        .select("*");
+      if (!context.isAdmin) query = query.eq("owner_id", user.id);
+      return query
+        .gte("date_submitted", start)
+        .lte("date_submitted", end)
+        .order("date_submitted", { ascending: true });
+    })(),
+    (() => {
+      let query = supabase
+        .from("reservations")
+        .select("*");
+      if (!context.isAdmin) query = query.eq("owner_id", user.id);
+      return query
+        .gte("reservation_date", start)
+        .lte("reservation_date", end)
+        .order("reservation_date", { ascending: true });
+    })(),
+    (() => {
+      let query = supabase
+        .from("vehicle_releases")
+        .select("*");
+      if (!context.isAdmin) query = query.eq("owner_id", user.id);
+      return query
+        .gte("release_date", start)
+        .lte("release_date", end)
+        .order("release_date", { ascending: true });
+    })(),
+    (() => {
+      let query = supabase
+        .from("lost_sales")
+        .select("*");
+      if (!context.isAdmin) query = query.eq("owner_id", user.id);
+      return query
+        .gte("date_marked_lost", start)
+        .lte("date_marked_lost", end)
+        .order("date_marked_lost", { ascending: true });
+    })(),
     getDashboardData(year, month),
   ]);
 
@@ -109,11 +125,12 @@ export async function GET(request: NextRequest) {
   ].filter((id) => !names.has(id));
 
   if (allLeadIds.length) {
-    const { data } = await supabase
+    let namesQuery = supabase
       .from("leads")
       .select("id, prospect_name, lead_code")
-      .eq("owner_id", user.id)
       .in("id", allLeadIds);
+    if (!context.isAdmin) namesQuery = namesQuery.eq("owner_id", user.id);
+    const { data } = await namesQuery;
     for (const row of data ?? []) {
       names.set(row.id, `${row.prospect_name} (${row.lead_code})`);
     }

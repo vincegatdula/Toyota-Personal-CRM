@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 
 interface SearchResult {
   id: string;
@@ -11,7 +11,8 @@ interface SearchResult {
 }
 
 export async function GET(request: NextRequest) {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
@@ -22,13 +23,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ results: [] });
   }
   const like = `%${term}%`;
-  const owner = user.id;
+  const scope = <T extends { eq: (column: string, value: string) => T }>(query: T) =>
+    context.isAdmin ? query : query.eq("owner_id", user.id);
 
   const [leads, financing, reservations, releases, lost] = await Promise.all([
-    supabase
+    scope(supabase
       .from("leads")
-      .select("id, lead_code, prospect_name, preferred_model, pipeline_status, lead_source, contact_number, email")
-      .eq("owner_id", owner)
+      .select("id, lead_code, prospect_name, preferred_model, pipeline_status, lead_source, contact_number, email"))
       .or(
         [
           `prospect_name.ilike.${like}`,
@@ -39,10 +40,9 @@ export async function GET(request: NextRequest) {
         ].join(","),
       )
       .limit(6),
-    supabase
+    scope(supabase
       .from("financing_applications")
-      .select("id, financing_code, lead_id, bank, application_status, preferred_model, remarks")
-      .eq("owner_id", owner)
+      .select("id, financing_code, lead_id, bank, application_status, preferred_model, remarks"))
       .or(
         [
           `financing_code.ilike.${like}`,
@@ -52,10 +52,9 @@ export async function GET(request: NextRequest) {
         ].join(","),
       )
       .limit(4),
-    supabase
+    scope(supabase
       .from("reservations")
-      .select("id, reservation_code, lead_id, reserved_model, current_status, remarks")
-      .eq("owner_id", owner)
+      .select("id, reservation_code, lead_id, reserved_model, current_status, remarks"))
       .or(
         [
           `reservation_code.ilike.${like}`,
@@ -64,10 +63,9 @@ export async function GET(request: NextRequest) {
         ].join(","),
       )
       .limit(4),
-    supabase
+    scope(supabase
       .from("vehicle_releases")
-      .select("id, release_code, lead_id, model_released, transaction, bank, remarks")
-      .eq("owner_id", owner)
+      .select("id, release_code, lead_id, model_released, transaction, bank, remarks"))
       .or(
         [
           `release_code.ilike.${like}`,
@@ -77,10 +75,9 @@ export async function GET(request: NextRequest) {
         ].join(","),
       )
       .limit(4),
-    supabase
+    scope(supabase
       .from("lost_sales")
-      .select("id, lost_code, lead_id, primary_loss_reason, preferred_model, competitor_alternative")
-      .eq("owner_id", owner)
+      .select("id, lost_code, lead_id, primary_loss_reason, preferred_model, competitor_alternative"))
       .or(
         [
           `lost_code.ilike.${like}`,
@@ -105,11 +102,12 @@ export async function GET(request: NextRequest) {
 
   const names = new Map<string, { name: string; code: string }>();
   if (leadIds.length) {
-    const { data } = await supabase
+    let namesQuery = supabase
       .from("leads")
       .select("id, prospect_name, lead_code")
-      .eq("owner_id", owner)
       .in("id", leadIds);
+    if (!context.isAdmin) namesQuery = namesQuery.eq("owner_id", user.id);
+    const { data } = await namesQuery;
     for (const row of data ?? []) {
       names.set(row.id, { name: row.prospect_name, code: row.lead_code });
     }

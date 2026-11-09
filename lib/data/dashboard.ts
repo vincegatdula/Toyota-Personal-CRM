@@ -1,4 +1,4 @@
-import { getSession, getProfile } from "@/lib/auth";
+import { getAuthContext, getProfile } from "@/lib/auth";
 import { getOptions, getTargetsFor, type OptionMap } from "@/lib/data/options";
 import { normalizePeriod, remainingWorkingDays, toISODate } from "@/lib/dates";
 import { safeFormatDate } from "@/lib/format";
@@ -123,7 +123,8 @@ export async function getDashboardData(
   year = period.year;
   month = period.month;
 
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   const [options, targets, profile] = await Promise.all([
     getOptions(),
     getTargetsFor(year, month),
@@ -196,35 +197,50 @@ export async function getDashboardData(
 
   const [leadsRes, releasesRes, financingRes, lostRes, reservationsRes] =
     await Promise.all([
-      supabase
-        .from("leads")
-        .select(
-          "id, lead_code, prospect_name, lead_source, preferred_model, pipeline_status, date_created, is_archived",
-        )
-        .eq("owner_id", user.id),
-      supabase
-        .from("vehicle_releases")
-        .select("*")
-        .eq("owner_id", user.id)
-        .gte("release_date", chartStart)
-        .lte("release_date", periodEnd)
-        .order("release_date", { ascending: false }),
-      supabase
-        .from("financing_applications")
-        .select("*")
-        .eq("owner_id", user.id)
-        .order("date_submitted", { ascending: false }),
-      supabase
-        .from("lost_sales")
-        .select("*")
-        .eq("owner_id", user.id)
-        .gte("date_marked_lost", chartStart)
-        .lte("date_marked_lost", periodEnd)
-        .order("date_marked_lost", { ascending: false }),
-      supabase
-        .from("reservations")
-        .select("*")
-        .eq("owner_id", user.id),
+      (() => {
+        let query = supabase
+          .from("leads")
+          .select(
+            "id, lead_code, prospect_name, lead_source, preferred_model, pipeline_status, date_created, is_archived",
+          );
+        if (!context.isAdmin) query = query.eq("owner_id", user.id);
+        return query;
+      })()
+        .gte("date_created", periodStart)
+        .lte("date_created", periodEnd)
+        .order("date_created", { ascending: true }),
+      (() => {
+        let query = supabase
+          .from("vehicle_releases")
+          .select("*");
+        if (!context.isAdmin) query = query.eq("owner_id", user.id);
+        return query
+          .gte("release_date", chartStart)
+          .lte("release_date", periodEnd)
+          .order("release_date", { ascending: false });
+      })(),
+      (() => {
+        let query = supabase
+          .from("financing_applications")
+          .select("*");
+        if (!context.isAdmin) query = query.eq("owner_id", user.id);
+        return query.order("date_submitted", { ascending: false });
+      })(),
+      (() => {
+        let query = supabase
+          .from("lost_sales")
+          .select("*");
+        if (!context.isAdmin) query = query.eq("owner_id", user.id);
+        return query
+          .gte("date_marked_lost", chartStart)
+          .lte("date_marked_lost", periodEnd)
+          .order("date_marked_lost", { ascending: false });
+      })(),
+      (() => {
+        let query = supabase.from("reservations").select("*");
+        if (!context.isAdmin) query = query.eq("owner_id", user.id);
+        return query;
+      })(),
     ]);
 
   const leads = (leadsRes.data ?? []) as Pick<

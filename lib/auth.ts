@@ -17,6 +17,34 @@ export async function requireUser() {
   return { supabase, user };
 }
 
+export interface AuthContext {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  user: Awaited<ReturnType<typeof getSession>>["user"];
+  profile: Profile | null;
+  isAdmin: boolean;
+}
+
+export async function getAuthContext() {
+  const { supabase, user } = await getSession();
+  const profile = user ? await getProfile() : null;
+  return { supabase, user, profile, isAdmin: isCrmAdmin(profile?.role) };
+}
+
+export async function requireAuthContext() {
+  const context = await getAuthContext();
+  if (!context.user) redirect("/login");
+  return { ...context, user: context.user };
+}
+
+export async function requireCrmAdminContext() {
+  const context = await getAuthContext();
+  if (!context.user) redirect("/login");
+  if (!context.isAdmin) {
+    throw new Error("Only CRM administrators can perform this action.");
+  }
+  return { ...context, user: context.user };
+}
+
 export function isCrmAdmin(role: CrmRole | null | undefined) {
   return role === "owner" || role === "admin";
 }

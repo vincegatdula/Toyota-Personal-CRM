@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { todayISO, toISODate } from "@/lib/dates";
 
 export interface AlertSummary {
@@ -13,7 +13,8 @@ export interface AlertSummary {
 }
 
 export async function getAlertSummary(): Promise<AlertSummary> {
-  const { supabase, user } = await getSession();
+  const context = await getAuthContext();
+  const { supabase, user } = context;
   const empty: AlertSummary = {
     overdueFollowUps: 0,
     dueToday: 0,
@@ -41,6 +42,9 @@ export async function getAlertSummary(): Promise<AlertSummary> {
     }
   };
 
+  const scope = <T extends { eq: (column: string, value: string) => T }>(query: T) =>
+    context.isAdmin ? query : query.eq("owner_id", user.id);
+
   const [
     overdueFollowUps,
     dueToday,
@@ -52,74 +56,78 @@ export async function getAlertSummary(): Promise<AlertSummary> {
     awaitingUnit,
   ] = await Promise.all([
     count(() =>
-      supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
+      scope(
+        supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true }),
+      )
         .eq("is_archived", false)
         .not("next_action_due_date", "is", null)
         .is("next_action_completed_at", null)
         .lt("next_action_due_date", today),
     ),
     count(() =>
-      supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
+      scope(
+        supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true }),
+      )
         .eq("is_archived", false)
         .eq("next_action_due_date", today)
         .is("next_action_completed_at", null),
     ),
     count(() =>
-      supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
+      scope(
+        supabase
+          .from("leads")
+          .select("id", { count: "exact", head: true }),
+      )
         .eq("is_archived", false)
         .gt("next_action_due_date", today)
         .lte("next_action_due_date", weekISO)
         .is("next_action_completed_at", null),
     ),
     count(() =>
-      supabase
-        .from("financing_applications")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
-        .in("application_status", [
-          "For assessment",
-          "Application submitted",
-          "Pending documents",
-          "Pending unit",
-        ]),
+      scope(
+        supabase
+          .from("financing_applications")
+          .select("id", { count: "exact", head: true }),
+      ).in("application_status", [
+        "For assessment",
+        "Application submitted",
+        "Pending documents",
+        "Pending unit",
+      ]),
     ),
     count(() =>
-      supabase
-        .from("financing_applications")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
-        .eq("application_status", "Pending documents"),
+      scope(
+        supabase
+          .from("financing_applications")
+          .select("id", { count: "exact", head: true }),
+      ).eq("application_status", "Pending documents"),
     ),
     count(() =>
-      supabase
-        .from("reservations")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
-        .eq("current_status", "Pending Docs"),
+      scope(
+        supabase
+          .from("reservations")
+          .select("id", { count: "exact", head: true }),
+      ).eq("current_status", "Pending Docs"),
     ),
     count(() =>
-      supabase
-        .from("reservations")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
+      scope(
+        supabase
+          .from("reservations")
+          .select("id", { count: "exact", head: true }),
+      )
         .lt("expected_release_date", today)
         .not("current_status", "in", "(Released,Cancelled)"),
     ),
     count(() =>
-      supabase
-        .from("reservations")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", user.id)
-        .eq("current_status", "Pending Unit"),
+      scope(
+        supabase
+          .from("reservations")
+          .select("id", { count: "exact", head: true }),
+      ).eq("current_status", "Pending Unit"),
     ),
   ]);
 
