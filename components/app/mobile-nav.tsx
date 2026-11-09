@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { NavItems } from "@/components/app/nav-items";
@@ -22,6 +22,22 @@ export function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
     <>
       <Button
@@ -30,18 +46,27 @@ export function MobileNav({
         className="lg:hidden"
         onClick={() => setOpen(true)}
         aria-label="Open navigation"
+        aria-expanded={open}
+        aria-controls="mobile-nav-drawer"
       >
         <Menu />
       </Button>
       {open ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-[100] lg:hidden" role="presentation">
           <button
+            type="button"
             aria-label="Close navigation"
-            className="absolute inset-0 bg-black/30"
+            className="absolute inset-0 z-0 bg-black/50"
             onClick={() => setOpen(false)}
           />
-          <div className="relative flex h-full w-[268px] flex-col border-r border-border bg-card p-3">
-            <div className="mb-5 flex items-center justify-between px-1">
+          <div
+            id="mobile-nav-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+            className="relative z-10 flex h-full max-h-dvh w-[min(20rem,calc(100vw-3rem))] flex-col overflow-y-auto border-r border-stone-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))] text-stone-900 shadow-xl"
+          >
+            <div className="mb-5 flex shrink-0 items-center justify-between px-1">
               <Link
                 href="/dashboard"
                 onClick={() => setOpen(false)}
@@ -60,10 +85,10 @@ export function MobileNav({
               </Button>
             </div>
             <NavItems isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
-            <div className="mt-auto flex items-center gap-2 border-t border-border pt-3 text-[11px] text-muted-foreground">
+            <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-stone-200 pt-3 text-[11px] text-stone-500">
               <AvatarImage name={name} avatarUrl={avatarUrl} className="h-7 w-7 text-[10px]" />
               <div className="min-w-0">
-                <p className="truncate font-medium text-foreground">{name}</p>
+                <p className="truncate font-medium text-stone-900">{name}</p>
                 <p className="truncate">{email}</p>
               </div>
             </div>
