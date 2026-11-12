@@ -69,11 +69,11 @@ export function NavItems({
             className={cn(
               "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors",
               active
-                ? "bg-[#f2f1ef] text-foreground"
-                : "text-stone-600 hover:bg-[#f6f5f3] hover:text-foreground",
+                ? "bg-secondary text-foreground"
+                : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground",
             )}
           >
-            <Icon className={cn("h-4 w-4", active ? "text-brand" : "text-stone-400")} />
+            <Icon className={cn("h-4 w-4", active ? "text-brand" : "text-muted-foreground")} />
             <span className="truncate">{item.label}</span>
           </Link>
         );

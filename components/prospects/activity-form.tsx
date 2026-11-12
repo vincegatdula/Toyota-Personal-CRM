@@ -37,12 +37,12 @@ export function ActivityForm({
     <form action={formAction} className="space-y-2.5">
       <input type="hidden" name="lead_id" value={leadId} />
       {state.error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] text-red-700">
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-[11px] text-destructive">
           {state.error}
         </p>
       ) : null}
       {state.message ? (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-700">
+        <p className="rounded-lg border border-success/30 bg-success/10 px-2.5 py-1.5 text-[11px] text-success">
           {state.message}
         </p>
       ) : null}

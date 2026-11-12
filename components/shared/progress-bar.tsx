@@ -13,13 +13,13 @@ export function ProgressBar({
   const fill = {
     default: "bg-primary",
     success: "bg-emerald-600",
-    warning: "bg-amber-500",
+    warning: "bg-warning/100",
     danger: "bg-red-600",
   }[tone];
 
   return (
     <div
-      className={cn("h-1.5 w-full overflow-hidden rounded-full bg-stone-200", className)}
+      className={cn("h-1.5 w-full overflow-hidden rounded-full bg-muted", className)}
       role="progressbar"
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}

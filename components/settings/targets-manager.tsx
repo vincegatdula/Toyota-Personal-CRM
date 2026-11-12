@@ -133,12 +133,12 @@ export function TargetsManager({
               </div>
             </div>
             {state.error ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
                 {state.error}
               </p>
             ) : null}
             {state.ok && state.message ? (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">
+              <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-[12px] text-success">
                 {state.message}
               </p>
             ) : null}

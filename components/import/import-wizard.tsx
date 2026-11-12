@@ -73,7 +73,7 @@ function IssueList({ issues }: { issues: ImportIssue[] }) {
               onClick={() => setFilter(value)}
               className={`rounded-full border px-2.5 py-0.5 text-[11px] capitalize ${
                 filter === value
-                  ? "border-brand bg-red-50 text-brand"
+                  ? "border-brand bg-destructive/10 text-brand"
                   : "border-border text-muted-foreground hover:bg-secondary"
               }`}
             >
@@ -231,7 +231,7 @@ function CommitSummary({
           <StatCard label="Skipped" value={result.skippedRecords + result.skippedLeads} hint={`${result.skippedLeads} leads, ${result.skippedRecords} records`} />
         </div>
         {result.errors.length ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-800">
+          <div className="rounded-lg border border-amber-200 bg-warning/10 p-2.5 text-[11px] text-amber-800">
             {result.errors.length} {pluralize(result.errors.length, "row")} could not be
             committed. See the import batch for details.
           </div>
@@ -364,12 +364,12 @@ export function ImportWizard() {
             </div>
           </div>
           {previewError ? (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
               {previewError}
             </p>
           ) : null}
           {result && !result.ok ? (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
               {result.error}
             </p>
           ) : null}

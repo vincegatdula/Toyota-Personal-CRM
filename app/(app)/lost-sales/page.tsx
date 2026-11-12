@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Plus, SearchX, TrendingDown } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { FilterBar, SearchField } from "@/components/shared/filter-bar";
+import { FilterBar, FilterField, SearchField } from "@/components/shared/filter-bar";
 import { Pagination } from "@/components/shared/pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
@@ -64,24 +64,24 @@ export default async function LostSalesPage({ searchParams }: { searchParams: Pr
         <SearchField defaultValue={filters.q} placeholder="Search reason, competitor, or prospect…" />
         <DateRangeFilter from={dateRange.from} to={dateRange.to} preset={dateRange.preset} />
         {isAdmin ? (
-          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+          <FilterField label="Owner"><Select name="owner" defaultValue={filters.owner ?? ""} className="h-10 w-full sm:min-w-40">
             <option value="">All owners</option>
             {owners.map((owner) => (<option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>))}
-          </Select>
+          </Select></FilterField>
         ) : null}
-        <Select name="reason" defaultValue={filters.reason ?? ""} className="h-8 w-auto min-w-40">
+        <FilterField label="Reason"><Select name="reason" defaultValue={filters.reason ?? ""} className="h-10 w-full sm:min-w-40">
           <option value="">All reasons</option>
           {(reasons.length ? reasons : LOST_SALE_REASON_FALLBACK).map((reason) => (<option key={reason} value={reason}>{reason}</option>))}
-        </Select>
-        <Select name="recovery" defaultValue={filters.recovery ?? ""} className="h-8 w-auto min-w-32">
+        </Select></FilterField>
+        <FilterField label="Recovery"><Select name="recovery" defaultValue={filters.recovery ?? ""} className="h-10 w-full sm:min-w-36">
           <option value="">All recovery states</option>
           <option value="open">Open</option>
           <option value="recovered">Recovered</option>
           <option value="closed">Closed</option>
-        </Select>
-        <div className="flex items-center gap-1.5">
-          <Button type="submit" size="sm" variant="outline">Apply</Button>
-          {hasFilters ? <Button asChild size="sm" variant="ghost"><Link href="/lost-sales"><SearchX /> Reset</Link></Button> : null}
+        </Select></FilterField>
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+          <Button type="submit" variant="outline" className="h-10">Apply</Button>
+          {hasFilters ? <Button asChild variant="ghost" className="h-10"><Link href="/lost-sales"><SearchX /> Reset</Link></Button> : null}
         </div>
       </FilterBar>
 

@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { Download, FileSpreadsheet, Printer } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
+import { FilterBar, FilterField } from "@/components/shared/filter-bar";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,33 +59,33 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         title={`${MONTH_NAMES[month - 1]} ${year} report`}
         description={`Monthly performance, lead-source mix, loss reasons, and release breakdown. Range: ${rangeLabel}.`}
         actions={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
-            <form method="get" className="flex w-full flex-col gap-2 rounded-xl border border-border bg-card p-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
-              <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
-                <span>Month</span>
-                <select name="month" defaultValue={month} className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]">
-                  {MONTH_NAMES.map((label, index) => (<option key={label} value={index + 1}>{label}</option>))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
-                <span>Year</span>
-                <select name="year" defaultValue={year} className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]">
-                  {Array.from({ length: 4 }, (_, index) => now.year - 1 + index).map((value) => (<option key={value} value={value}>{value}</option>))}
-                </select>
-              </label>
-              <DateRangeFilter from={resolvedRange.from} to={resolvedRange.to} preset={resolvedRange.preset} />
-              <div className="flex items-center gap-1.5">
-                <Button type="submit" size="sm" variant="outline">View</Button>
-                <Button asChild type="button" size="sm" variant="ghost"><Link href="/reports">Reset</Link></Button>
-              </div>
-            </form>
-            <div className="flex gap-1.5">
-              <Button asChild size="sm" variant="outline"><a href={exportHref("report", "xlsx")}><FileSpreadsheet /> Excel</a></Button>
-              <Button asChild size="sm" variant="outline"><a href={exportHref("report", "csv")}><Download /> CSV</a></Button>
-            </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" className="h-10"><a href={exportHref("report", "xlsx")}><FileSpreadsheet /> Excel</a></Button>
+            <Button asChild variant="outline" className="h-10"><a href={exportHref("report", "csv")}><Download /> CSV</a></Button>
           </div>
         }
       />
+
+      <FilterBar>
+        <FilterField label="Month">
+          <Select name="month" defaultValue={month} className="h-10 w-full sm:min-w-[140px]">
+            {MONTH_NAMES.map((label, index) => (<option key={label} value={index + 1}>{label}</option>))}
+          </Select>
+        </FilterField>
+        <FilterField label="Year">
+          <Select name="year" defaultValue={year} className="h-10 w-full sm:min-w-[110px]">
+            {Array.from({ length: 4 }, (_, index) => now.year - 1 + index).map((value) => (<option key={value} value={value}>{value}</option>))}
+          </Select>
+        </FilterField>
+        <DateRangeFilter from={resolvedRange.from} to={resolvedRange.to} preset={resolvedRange.preset} />
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+          <Button type="submit" variant="outline" className="h-10">View</Button>
+          <Button asChild type="button" variant="ghost" className="h-10"><Link href="/reports">Reset</Link></Button>
+        </div>
+        <p className="w-full text-[11px] text-muted-foreground sm:ml-auto sm:w-auto sm:self-end sm:pb-2.5">
+          Reporting period: <span className="font-medium text-foreground">{rangeLabel}</span>
+        </p>
+      </FilterBar>
 
       <section className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Target" value={formatNumber(data.kpis.salesTarget)} hint="Sales units" tone="brand" />

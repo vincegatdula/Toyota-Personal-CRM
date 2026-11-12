@@ -15,7 +15,7 @@ export default async function LoginPage({
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden overflow-hidden bg-[#171717] p-10 text-white lg:flex lg:flex-col lg:justify-between">
+      <div className="relative hidden overflow-hidden bg-zinc-950 p-10 text-zinc-50 lg:flex lg:flex-col lg:justify-between">
         <div
           aria-hidden
           className="absolute -top-24 -left-24 h-96 w-96 rounded-full border border-white/10"
@@ -26,7 +26,7 @@ export default async function LoginPage({
         />
         <div className="relative">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-[11px] tracking-wide text-white/70 uppercase">
-            <BrandMark className="h-5 w-5 rounded-md border border-white/10" imageClassName="p-0.5" />
+            <BrandMark className="h-5 w-5 rounded-md border border-white/10 bg-zinc-900 ring-0" imageClassName="p-0.5 invert brightness-200" />
             Toyota sales workspace
           </div>
           <h2 className="mt-8 max-w-md text-[34px] leading-tight font-semibold tracking-tight">
@@ -62,7 +62,7 @@ export default async function LoginPage({
         </div>
 
         {params.error ? (
-          <p className="mb-4 w-full max-w-sm rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+          <p className="mb-4 w-full max-w-sm rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
             {params.error}
           </p>
         ) : null}

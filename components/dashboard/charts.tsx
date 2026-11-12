@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import {
   Bar,
   BarChart,
@@ -15,45 +16,70 @@ import {
   YAxis,
 } from "recharts";
 
-const PALETTE = [
-  "#d32f2f",
-  "#1c1917",
-  "#78716c",
-  "#0f766e",
-  "#b45309",
-  "#1d4ed8",
-  "#7c3aed",
-  "#15803d",
-  "#be185d",
-  "#a8a29e",
+export const CHART_SERIES = [
+  "var(--color-brand)",
+  "var(--color-info)",
+  "var(--color-warning)",
+  "var(--color-success)",
+  "#8b5cf6",
+  "#14b8a6",
+  "#f97316",
+  "#64748b",
 ];
 
-const tooltipStyle = {
-  borderRadius: 10,
-  border: "1px solid #e7e5e3",
-  backgroundColor: "#ffffff",
-  color: "#1c1917",
-  fontSize: 11,
-  boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-  opacity: 1,
-};
+function useChartTheme() {
+  const mounted = useSyncExternalStore(
+    (cb) => {
+      const obs = new MutationObserver(cb);
+      obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style"] });
+      return () => obs.disconnect();
+    },
+    () => document.documentElement.classList.contains("dark"),
+    () => false,
+  );
+  const dark = mounted;
 
-const tooltipLabelStyle = { color: "#1c1917", fontWeight: 600 };
-const tooltipItemStyle = { color: "#44403c" };
+  const grid = dark ? "rgba(255,255,255,0.08)" : "var(--color-border)";
+  const axis = "var(--color-muted-foreground)";
+  const tooltipStyle = {
+    borderRadius: 10,
+    border: `1px solid var(--color-border)`,
+    backgroundColor: "var(--color-popover)",
+    color: "var(--color-foreground)",
+    fontSize: 11,
+    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+    opacity: 1,
+  };
+  const tooltipLabelStyle = { color: "var(--color-foreground)", fontWeight: 600 };
+  const tooltipItemStyle = { color: "var(--color-muted-foreground)" };
+
+  return {
+    grid,
+    axis,
+    tooltipStyle,
+    tooltipLabelStyle,
+    tooltipItemStyle,
+    prospects: dark ? "#60A5FA" : "#2563eb",
+    releases: dark ? "#FB7185" : "#d32f2f",
+    ratio: "var(--color-foreground)",
+    palette: CHART_SERIES,
+  };
+}
 
 export function MonthlyChart({
   data,
 }: {
   data: { label: string; releases: number; prospects: number; closingRatio: number }[];
 }) {
+  const t = useChartTheme();
   return (
     <div className="h-[260px] w-full min-w-0">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
-          <CartesianGrid stroke="#efeeec" vertical={false} />
+          <CartesianGrid stroke={t.grid} vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 10, fill: "#57534e" }}
+            tick={{ fontSize: 10, fill: t.axis }}
             axisLine={false}
             tickLine={false}
             interval={0}
@@ -61,7 +87,7 @@ export function MonthlyChart({
           <YAxis
             yAxisId="left"
             allowDecimals={false}
-            tick={{ fontSize: 10, fill: "#57534e" }}
+            tick={{ fontSize: 10, fill: t.axis }}
             axisLine={false}
             tickLine={false}
             width={28}
@@ -70,16 +96,16 @@ export function MonthlyChart({
             yAxisId="right"
             orientation="right"
             allowDecimals
-            tick={{ fontSize: 10, fill: "#57534e" }}
+            tick={{ fontSize: 10, fill: t.axis }}
             axisLine={false}
             tickLine={false}
             width={28}
             tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
           />
           <Tooltip
-            contentStyle={tooltipStyle}
-            labelStyle={tooltipLabelStyle}
-            itemStyle={tooltipItemStyle}
+            contentStyle={t.tooltipStyle}
+            labelStyle={t.tooltipLabelStyle}
+            itemStyle={t.tooltipItemStyle}
             formatter={(value, name) => {
               if (name === "Closing ratio") return [`${(Number(value) * 100).toFixed(1)}%`, name];
               return [value, name];
@@ -89,7 +115,7 @@ export function MonthlyChart({
             yAxisId="left"
             dataKey="prospects"
             name="Prospects Created"
-            fill="#2563eb"
+            fill={t.prospects}
             radius={[4, 4, 0, 0]}
             maxBarSize={24}
           />
@@ -97,7 +123,7 @@ export function MonthlyChart({
             yAxisId="left"
             dataKey="releases"
             name="Releases"
-            fill="#d32f2f"
+            fill={t.releases}
             radius={[4, 4, 0, 0]}
             maxBarSize={24}
           />
@@ -106,9 +132,9 @@ export function MonthlyChart({
             type="monotone"
             dataKey="closingRatio"
             name="Closing ratio"
-            stroke="#1c1917"
+            stroke={t.ratio}
             strokeWidth={2}
-            dot={{ r: 2.5, fill: "#1c1917" }}
+            dot={{ r: 2.5, fill: t.ratio }}
             activeDot={{ r: 4 }}
           />
         </ComposedChart>
@@ -124,6 +150,7 @@ export function DonutChart({
   data: { name: string; value: number }[];
   height?: number;
 }) {
+  const t = useChartTheme();
   return (
     <div className="w-full min-w-0" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -138,10 +165,10 @@ export function DonutChart({
             stroke="none"
           >
             {data.map((entry, index) => (
-              <Cell key={entry.name} fill={PALETTE[index % PALETTE.length]} />
+              <Cell key={entry.name} fill={t.palette[index % t.palette.length]} />
             ))}
           </Pie>
-          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
+          <Tooltip contentStyle={t.tooltipStyle} labelStyle={t.tooltipLabelStyle} itemStyle={t.tooltipItemStyle} />
         </PieChart>
       </ResponsiveContainer>
     </div>
@@ -151,12 +178,13 @@ export function DonutChart({
 export function RankedBars({
   data,
   height = 240,
-  color = "#1c1917",
+  color = "var(--color-foreground)",
 }: {
   data: { name: string; value: number }[];
   height?: number;
   color?: string;
 }) {
+  const t = useChartTheme();
   return (
     <div className="w-full min-w-0" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -165,11 +193,11 @@ export function RankedBars({
           layout="vertical"
           margin={{ top: 4, right: 12, left: 4, bottom: 0 }}
         >
-          <CartesianGrid stroke="#efeeec" horizontal={false} />
+          <CartesianGrid stroke={t.grid} horizontal={false} />
           <XAxis
             type="number"
             allowDecimals={false}
-            tick={{ fontSize: 10, fill: "#57534e" }}
+            tick={{ fontSize: 10, fill: t.axis }}
             axisLine={false}
             tickLine={false}
           />
@@ -177,11 +205,11 @@ export function RankedBars({
             type="category"
             dataKey="name"
             width={110}
-            tick={{ fontSize: 10, fill: "#44403c" }}
+            tick={{ fontSize: 10, fill: t.axis }}
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
+          <Tooltip contentStyle={t.tooltipStyle} labelStyle={t.tooltipLabelStyle} itemStyle={t.tooltipItemStyle} />
           <Bar dataKey="value" name="Count" fill={color} radius={[0, 4, 4, 0]} maxBarSize={16} />
         </BarChart>
       </ResponsiveContainer>

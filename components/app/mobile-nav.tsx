@@ -46,7 +46,7 @@ export function MobileNav({
         type="button"
         aria-label="Close navigation"
         data-mobile-nav-backdrop="true"
-        className="fixed inset-0 z-[110] h-[100dvh] w-screen bg-black/50"
+        className="fixed inset-0 z-[110] h-[100dvh] w-screen bg-black/50 backdrop-blur-[1px]"
         onClick={() => setOpen(false)}
       />
       <div
@@ -55,7 +55,7 @@ export function MobileNav({
         aria-modal="true"
         aria-label="Navigation menu"
         data-mobile-nav-drawer="true"
-        className="fixed inset-y-0 left-0 z-[120] flex h-[100dvh] w-[min(20rem,calc(100vw-3rem))] flex-col overflow-y-auto overscroll-contain border-r border-stone-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))] text-stone-900 shadow-xl"
+        className="fixed inset-y-0 left-0 z-[120] flex h-[100dvh] w-[min(20rem,calc(100vw-3rem))] flex-col overflow-y-auto overscroll-contain border-r border-border bg-card p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))] text-foreground shadow-xl"
       >
         <div className="mb-5 flex shrink-0 items-center justify-between px-1">
           <Link
@@ -63,7 +63,7 @@ export function MobileNav({
             onClick={() => setOpen(false)}
             className="flex items-center gap-2"
           >
-            <BrandMark className="h-8 w-8 border border-border/60" />
+            <BrandMark className="h-8 w-8" />
             <span className="text-[13px] font-semibold">{APP_NAME}</span>
           </Link>
           <Button
@@ -76,10 +76,10 @@ export function MobileNav({
           </Button>
         </div>
         <NavItems isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
-        <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-stone-200 pt-3 text-[11px] text-stone-500">
+        <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-border pt-3 text-[11px] text-muted-foreground">
           <AvatarImage name={name} avatarUrl={avatarUrl} className="h-7 w-7 text-[10px]" />
           <div className="min-w-0">
-            <p className="truncate font-medium text-stone-900">{name}</p>
+            <p className="truncate font-medium text-foreground">{name}</p>
             <p className="truncate">{email}</p>
           </div>
         </div>

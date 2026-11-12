@@ -18,7 +18,7 @@ export default function ErrorPage({
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 text-center">
-        <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 text-brand">
+        <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10 text-brand">
           <AlertTriangle className="h-5 w-5" />
         </span>
         <h1 className="mt-3 text-lg font-semibold">Something went wrong</h1>

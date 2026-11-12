@@ -88,7 +88,7 @@ export function ReleaseForm({
     <form action={formAction} className="space-y-3">
       {record ? <input type="hidden" name="id" value={record.id} /> : null}
       {state.error ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
           {state.error}
         </p>
       ) : null}

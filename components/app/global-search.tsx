@@ -76,7 +76,7 @@ export function GlobalSearch() {
           onChange={(event) => updateQuery(event.target.value)}
           onFocus={() => results.length && setOpen(true)}
           placeholder="Search prospects, codes, models…"
-          className="h-8 w-full rounded-lg border border-input bg-[#f6f5f3] pr-8 pl-8 text-[12px] focus-visible:border-ring focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:outline-none"
+          className="h-9 w-full rounded-lg border border-input bg-secondary/50 pr-8 pl-8 text-[12px] text-foreground focus-visible:border-ring focus-visible:bg-card focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:outline-none"
         />
         {loading ? (
           <Loader2 className="absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />

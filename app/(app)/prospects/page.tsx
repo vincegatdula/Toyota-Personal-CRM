@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Archive, ArchiveRestore, Plus, SearchX, UserRound } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { FilterBar, SearchField } from "@/components/shared/filter-bar";
+import { FilterBar, FilterField, SearchField } from "@/components/shared/filter-bar";
 import { Pagination } from "@/components/shared/pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
@@ -97,38 +97,38 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
         <SearchField defaultValue={filters.q} placeholder="Search name, code, number, email, or model…" />
         <DateRangeFilter from={dateRange.from} to={dateRange.to} preset={dateRange.preset} />
         {isAdmin ? (
-          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+          <FilterField label="Owner"><Select name="owner" defaultValue={filters.owner ?? ""} className="h-10 w-full sm:min-w-40">
             <option value="">All owners</option>
             {owners.map((owner) => (<option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>))}
-          </Select>
+          </Select></FilterField>
         ) : null}
-        <Select name="source" defaultValue={filters.source ?? ""} className="h-8 w-auto min-w-36">
+        <FilterField label="Lead source"><Select name="source" defaultValue={filters.source ?? ""} className="h-10 w-full sm:min-w-40">
           <option value="">All lead sources</option>
           {(sources.length ? sources : LEAD_SOURCE_FALLBACK).map((source) => (<option key={source} value={source}>{source}</option>))}
-        </Select>
-        <Select name="status" defaultValue={filters.status ?? ""} className="h-8 w-auto min-w-32">
+        </Select></FilterField>
+        <FilterField label="Status"><Select name="status" defaultValue={filters.status ?? ""} className="h-10 w-full sm:min-w-36">
           <option value="">All statuses</option>
           {(statuses.length ? statuses : PIPELINE_STATUS_FALLBACK).map((status) => (<option key={status} value={status}>{status}</option>))}
-        </Select>
-        <Select name="transaction" defaultValue={filters.transaction ?? ""} className="h-8 w-auto min-w-32">
+        </Select></FilterField>
+        <FilterField label="Transaction"><Select name="transaction" defaultValue={filters.transaction ?? ""} className="h-10 w-full sm:min-w-36">
           <option value="">All transactions</option>
           {(transactions.length ? transactions : TRANSACTION_FALLBACK).map((value) => (<option key={value} value={value}>{value}</option>))}
-        </Select>
-        <Select name="followUp" defaultValue={filters.followUp ?? ""} className="h-8 w-auto min-w-32">
+        </Select></FilterField>
+        <FilterField label="Follow-up"><Select name="followUp" defaultValue={filters.followUp ?? ""} className="h-10 w-full sm:min-w-36">
           <option value="">Any follow-up</option>
           <option value="overdue">Overdue</option>
           <option value="today">Due today</option>
           <option value="upcoming">Next 7 days</option>
-        </Select>
-        <Select name="sort" defaultValue={filters.sort ?? "newest"} className="h-8 w-auto min-w-32">
+        </Select></FilterField>
+        <FilterField label="Sort"><Select name="sort" defaultValue={filters.sort ?? "newest"} className="h-10 w-full sm:min-w-36">
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="next_action">Next action</option>
           <option value="name">Name A–Z</option>
-        </Select>
-        <div className="flex items-center gap-1.5">
-          <Button type="submit" size="sm" variant="outline">Apply</Button>
-          {activeFilters ? <Button asChild size="sm" variant="ghost"><Link href={resetHref}><SearchX /> Reset</Link></Button> : null}
+        </Select></FilterField>
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+          <Button type="submit" variant="outline" className="h-10">Apply</Button>
+          {activeFilters ? <Button asChild variant="ghost" className="h-10"><Link href={resetHref}><SearchX /> Reset</Link></Button> : null}
         </div>
       </FilterBar>
 
@@ -166,7 +166,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
                     {lead.next_action ? (
                       <div>
                         <span className="block max-w-[220px] truncate">{lead.next_action}</span>
-                        <span className={lead.next_action_completed_at ? "text-[10px] text-emerald-700" : isOverdue(lead.next_action_due_date) ? "text-[10px] font-medium text-red-700" : "text-[10px] text-muted-foreground"}>
+                        <span className={lead.next_action_completed_at ? "text-[10px] text-success" : isOverdue(lead.next_action_due_date) ? "text-[10px] font-medium text-destructive" : "text-[10px] text-muted-foreground"}>
                           {lead.next_action_completed_at ? "Completed" : formatDate(lead.next_action_due_date)}
                         </span>
                       </div>

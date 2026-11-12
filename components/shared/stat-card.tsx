@@ -18,10 +18,10 @@ export function StatCard({
 }) {
   const iconTone = {
     default: "bg-secondary text-muted-foreground",
-    brand: "bg-red-50 text-brand",
-    positive: "bg-emerald-50 text-emerald-700",
-    warning: "bg-amber-50 text-amber-700",
-    danger: "bg-red-50 text-red-700",
+    brand: "bg-brand/10 text-brand",
+    positive: "bg-success/10 text-success",
+    warning: "bg-warning/10 text-warning",
+    danger: "bg-destructive/10 text-destructive",
   }[tone];
 
   return (

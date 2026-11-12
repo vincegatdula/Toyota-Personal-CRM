@@ -83,7 +83,7 @@ export default function SetupPage() {
           <CardTitle className="text-[12px]">Environment variables</CardTitle>
         </CardHeader>
         <CardContent className="p-3.5 pt-0">
-          <pre className="overflow-x-auto rounded-lg bg-[#171717] p-3 text-[11px] leading-relaxed text-white/80">
+          <pre className="overflow-x-auto rounded-lg bg-zinc-950 p-3 text-[11px] leading-relaxed text-zinc-200">
 {`NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key

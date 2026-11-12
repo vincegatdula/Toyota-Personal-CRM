@@ -126,7 +126,7 @@ export default async function ProspectDetailPage({
       />
 
       {lead.is_archived ? (
-        <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-warning/10 px-3 py-2 text-[12px] text-amber-800">
           <Archive className="h-4 w-4" />
           This prospect is archived. Restore it to bring it back into the active
           pipeline.
@@ -361,7 +361,7 @@ export default async function ProspectDetailPage({
                         </p>
                       ) : null}
                       {activity.outcome ? (
-                        <p className="mt-0.5 text-[11px] text-emerald-700">
+                        <p className="mt-0.5 text-[11px] text-success">
                           Outcome: {activity.outcome}
                         </p>
                       ) : null}
@@ -391,9 +391,9 @@ export default async function ProspectDetailPage({
                   <p
                     className={
                       lead.next_action_completed_at
-                        ? "text-[11px] text-emerald-700"
+                        ? "text-[11px] text-success"
                         : isOverdue(lead.next_action_due_date)
-                          ? "text-[11px] font-medium text-red-700"
+                          ? "text-[11px] font-medium text-destructive"
                           : "text-[11px] text-muted-foreground"
                     }
                   >

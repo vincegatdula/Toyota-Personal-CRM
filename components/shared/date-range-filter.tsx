@@ -33,11 +33,11 @@ export function DateRangeFilter({
   });
   const normalized = normalizedDateRangeForInput(resolved);
   return (
-    <div className={cn("flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end", className)}>
+    <div className={cn("flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end", className)}>
       {showPresets ? (
-        <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+        <label className="flex w-full flex-col gap-1 text-[11px] font-medium text-muted-foreground sm:w-auto">
           <span>Range</span>
-          <Select name="range" defaultValue={normalized.preset || ""} className="h-8 w-full sm:w-auto sm:min-w-36">
+          <Select name="range" defaultValue={normalized.preset || ""} className="h-10 w-full sm:w-auto sm:min-w-36">
             <option value="">Custom / All</option>
             {PRESETS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
@@ -45,23 +45,23 @@ export function DateRangeFilter({
           </Select>
         </label>
       ) : null}
-      <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+      <label className="flex w-full flex-col gap-1 text-[11px] font-medium text-muted-foreground sm:w-auto">
         <span>From</span>
         <Input
           type="date"
           name="from"
           defaultValue={normalized.from}
-          className="h-8 w-full sm:w-[150px]"
+          className="h-10 w-full sm:w-[160px]"
           aria-label="From date"
         />
       </label>
-      <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+      <label className="flex w-full flex-col gap-1 text-[11px] font-medium text-muted-foreground sm:w-auto">
         <span>To</span>
         <Input
           type="date"
           name="to"
           defaultValue={normalized.to}
-          className="h-8 w-full sm:w-[150px]"
+          className="h-10 w-full sm:w-[160px]"
           aria-label="To date"
         />
       </label>
@@ -71,9 +71,9 @@ export function DateRangeFilter({
 
 export function DateRangeActions({ resetHref }: { resetHref: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <Button type="submit" size="sm" variant="outline">Apply</Button>
-      <Button asChild type="button" size="sm" variant="ghost">
+    <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+      <Button type="submit" variant="outline" className="h-10">Apply</Button>
+      <Button asChild type="button" variant="ghost" className="h-10">
         <a href={resetHref}>Reset</a>
       </Button>
     </div>

@@ -59,7 +59,7 @@ function AddModelForm() {
         <span className="text-[10px] text-red-600 sm:col-span-3">{state.error}</span>
       ) : null}
       {state.ok && state.message ? (
-        <span className="text-[10px] text-emerald-700 sm:col-span-3">
+        <span className="text-[10px] text-success sm:col-span-3">
           {state.message}
         </span>
       ) : null}

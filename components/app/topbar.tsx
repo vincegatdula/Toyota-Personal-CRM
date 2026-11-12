@@ -22,7 +22,7 @@ export function Topbar({
   isAdmin?: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-[#fbfbfa]/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
       <div className="flex h-12 items-center gap-2 px-3 sm:px-4">
         <MobileNav name={name} email={email} avatarUrl={avatarUrl} isAdmin={isAdmin} />
         <Link href="/dashboard" className="hidden items-center gap-2 lg:flex" aria-label="Dashboard">

@@ -17,12 +17,13 @@ import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { ProgressBar } from "@/components/shared/progress-bar";
 import { EmptyState } from "@/components/shared/empty-state";
-import { DashboardBrand } from "@/components/dashboard/dashboard-brand";
+import { FilterBar, FilterField } from "@/components/shared/filter-bar";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PipelineBadge } from "@/components/ui/status-badge";
+import { Select } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -31,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DonutChart, MonthlyChart, RankedBars } from "@/components/dashboard/charts";
+import { CHART_SERIES, DonutChart, MonthlyChart, RankedBars } from "@/components/dashboard/charts";
 import { getDashboardData } from "@/lib/data/dashboard";
 import { getFollowUps } from "@/lib/data/leads";
 import { completeFollowUp } from "@/app/actions/leads";
@@ -72,9 +73,9 @@ export default async function DashboardPage({
   ]);
   const k = data.kpis;
   const followUpGroups = [
-    { key: "overdue", label: "Overdue", items: followUps.overdue, tone: "text-red-700" },
-    { key: "today", label: "Due today", items: followUps.dueToday, tone: "text-amber-700" },
-    { key: "upcoming", label: "Next 7 days", items: followUps.upcoming, tone: "text-stone-600" },
+    { key: "overdue", label: "Overdue", items: followUps.overdue, tone: "text-destructive" },
+    { key: "today", label: "Due today", items: followUps.dueToday, tone: "text-warning" },
+    { key: "upcoming", label: "Next 7 days", items: followUps.upcoming, tone: "text-muted-foreground" },
   ];
   const years = Array.from({ length: 4 }, (_, index) => now.year - 1 + index);
 
@@ -82,59 +83,50 @@ export default async function DashboardPage({
     ? `${effectiveRange.from ?? "…"} to ${effectiveRange.to ?? "…"}`
     : `${MONTHS[month - 1]} ${year}`;
 
+  const reportsHref = `/reports?year=${year}&month=${month}${resolvedRange.from ? `&from=${resolvedRange.from}` : ""}${resolvedRange.to ? `&to=${resolvedRange.to}` : ""}${resolvedRange.preset ? `&range=${resolvedRange.preset}` : ""}`;
+
   return (
     <div className="page-container min-w-0 overflow-x-hidden">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
           eyebrow="Workspace"
           title={`Good day${data.profileName ? `, ${data.profileName.split(" ")[0]}` : ""}`}
           description={`${rangeLabel} performance at a glance. ${data.remainingWorkingDays} working day${data.remainingWorkingDays === 1 ? "" : "s"} remaining in ${MONTHS[month - 1]} ${year}.`}
           className="mb-0 min-w-0 flex-1"
-          actions={
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
-              <DashboardBrand />
-              <form method="get" className="flex w-full flex-col gap-2 rounded-xl border border-border bg-card p-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
-                <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
-                  <span>Month</span>
-                  <select
-                    name="month"
-                    defaultValue={month}
-                    className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]"
-                  >
-                    {MONTHS.map((label, index) => (
-                      <option key={label} value={index + 1}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
-                  <span>Year</span>
-                  <select
-                    name="year"
-                    defaultValue={year}
-                    className="h-8 rounded-lg border border-input bg-card px-2 text-[12px]"
-                  >
-                    {years.map((value) => (
-                      <option key={value} value={value}>{value}</option>
-                    ))}
-                  </select>
-                </label>
-                <DateRangeFilter from={resolvedRange.from} to={resolvedRange.to} preset={resolvedRange.preset} />
-                <div className="flex items-center gap-1.5">
-                  <Button type="submit" size="sm" variant="outline">Apply</Button>
-                  <Button asChild type="button" size="sm" variant="ghost">
-                    <Link href="/dashboard">Reset</Link>
-                  </Button>
-                </div>
-              </form>
-              <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
-                <Link href={`/reports?year=${year}&month=${month}${resolvedRange.from ? `&from=${resolvedRange.from}` : ""}${resolvedRange.to ? `&to=${resolvedRange.to}` : ""}${resolvedRange.preset ? `&range=${resolvedRange.preset}` : ""}`}>
-                  <FileText /> Reports
-                </Link>
-              </Button>
-            </div>
-          }
         />
+        <Button asChild variant="outline" className="h-10 w-full sm:w-auto">
+          <Link href={reportsHref}>
+            <FileText /> Reports
+          </Link>
+        </Button>
       </div>
+
+      <FilterBar className="mb-4">
+        <FilterField label="Month">
+          <Select name="month" defaultValue={month} className="h-10 w-full sm:min-w-[140px]">
+            {MONTHS.map((label, index) => (
+              <option key={label} value={index + 1}>{label}</option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField label="Year">
+          <Select name="year" defaultValue={year} className="h-10 w-full sm:min-w-[110px]">
+            {years.map((value) => (
+              <option key={value} value={value}>{value}</option>
+            ))}
+          </Select>
+        </FilterField>
+        <DateRangeFilter from={resolvedRange.from} to={resolvedRange.to} preset={resolvedRange.preset} />
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+          <Button type="submit" variant="outline" className="h-10">Apply</Button>
+          <Button asChild type="button" variant="ghost" className="h-10">
+            <Link href="/dashboard">Reset</Link>
+          </Button>
+        </div>
+        <p className="w-full text-[11px] text-muted-foreground sm:ml-auto sm:w-auto sm:self-end sm:pb-2.5">
+          Reporting period: <span className="font-medium text-foreground">{rangeLabel}</span>
+        </p>
+      </FilterBar>
 
       <section className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Sales target" value={formatNumber(k.salesTarget)} hint={`${k.totalReleases} released · ${k.remainingToTarget} to go`} icon={Target} tone="brand" />
@@ -169,7 +161,7 @@ export default async function DashboardPage({
                   <span className="min-w-0 truncate font-medium">{row.metric}</span>
                   <span className="shrink-0 text-muted-foreground tabular-nums">
                     {row.actual} / {row.target}{" "}
-                    <span className={row.remarks === "Target Met" ? "font-medium text-emerald-700" : "font-medium text-amber-700"}>
+                    <span className={row.remarks === "Target Met" ? "font-medium text-success" : "font-medium text-warning"}>
                       · {row.remarks}
                     </span>
                   </span>
@@ -245,7 +237,7 @@ export default async function DashboardPage({
                 <div className="grid w-full grid-cols-2 gap-1">
                   {data.leadSourceSummary.filter((row) => row.count > 0).slice(0, 6).map((row, index) => (
                     <div key={row.label} className="flex min-w-0 items-center gap-1.5 text-[10px]">
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: ["#d32f2f","#1c1917","#78716c","#0f766e","#b45309","#1d4ed8"][index % 6] }} />
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: CHART_SERIES[index % CHART_SERIES.length] }} />
                       <span className="truncate text-muted-foreground">{row.label}</span>
                       <span className="ml-auto font-medium tabular-nums">{row.count}</span>
                     </div>
@@ -275,7 +267,7 @@ export default async function DashboardPage({
         <Card className="min-w-0">
           <CardHeader><CardTitle>Lost-sale reasons</CardTitle></CardHeader>
           <CardContent className="min-w-0">
-            {data.charts.lostReasons.length ? <RankedBars data={data.charts.lostReasons.slice(0, 6)} height={230} color="#b45309" /> : <EmptyState title="No lost sales" description="Loss reasons appear when a prospect is marked lost." className="border-0 bg-transparent py-6" />}
+            {data.charts.lostReasons.length ? <RankedBars data={data.charts.lostReasons.slice(0, 6)} height={230} color="var(--color-warning)" /> : <EmptyState title="No lost sales" description="Loss reasons appear when a prospect is marked lost." className="border-0 bg-transparent py-6" />}
           </CardContent>
         </Card>
       </div>
@@ -319,7 +311,7 @@ export default async function DashboardPage({
         <Card className="min-w-0">
           <CardHeader><CardTitle>Performance summary</CardTitle></CardHeader>
           <CardContent>
-            <div className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2">
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-lg bg-muted/50 px-3 py-2">
               <div className="min-w-0">
                 <p className="truncate text-[12px] font-medium">{data.performance.name}</p>
                 <p className="truncate text-[10px] text-muted-foreground">{data.performance.status}</p>

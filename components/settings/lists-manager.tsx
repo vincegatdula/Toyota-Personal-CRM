@@ -134,7 +134,7 @@ function AddOptionForm({ category }: { category: string }) {
         <span className="w-full text-[10px] text-red-600">{state.error}</span>
       ) : null}
       {state.ok && state.message ? (
-        <span className="w-full text-[10px] text-emerald-700">{state.message}</span>
+        <span className="w-full text-[10px] text-success">{state.message}</span>
       ) : null}
     </form>
   );

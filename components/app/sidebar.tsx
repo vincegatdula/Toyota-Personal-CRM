@@ -16,9 +16,9 @@ export function Sidebar({
   isAdmin?: boolean;
 }) {
   return (
-    <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col border-r border-border bg-[#fbfbfa] px-3 py-4 lg:flex">
+    <aside className="sticky top-0 hidden h-screen w-[236px] shrink-0 flex-col border-r border-border bg-background px-3 py-4 lg:flex">
       <Link href="/dashboard" className="mb-5 flex items-center gap-2 px-1.5">
-        <BrandMark className="h-8 w-8 border border-border/60" priorityHint />
+        <BrandMark className="h-8 w-8" priorityHint />
         <span>
           <span className="block text-[13px] leading-tight font-semibold">
             {APP_NAME}
@@ -34,7 +34,7 @@ export function Sidebar({
       <div className="mt-auto border-t border-border pt-3">
         <Link
           href="/settings"
-          className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-[#f2f1ef]"
+          className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-secondary"
         >
           <AvatarImage name={name} avatarUrl={avatarUrl} className="h-7 w-7 text-[10px]" />
           <span className="min-w-0">

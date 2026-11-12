@@ -19,7 +19,7 @@ export function AvatarImage({
   const label = initials(name);
   if (avatarUrl && !failed) {
     return (
-      <span className={cn("relative block overflow-hidden rounded-full bg-[#e8e6e2]", className)}>
+      <span className={cn("relative block overflow-hidden rounded-full bg-secondary", className)}>
         {/* eslint-disable-next-line @next/next/no-img-element -- signed/public avatar URLs may vary by environment */}
         <img
           src={avatarUrl}
@@ -35,7 +35,7 @@ export function AvatarImage({
   return (
     <span
       className={cn(
-        "flex items-center justify-center rounded-full bg-[#e8e6e2] font-semibold text-stone-700",
+        "flex items-center justify-center rounded-full bg-secondary font-semibold text-foreground/80",
         className,
         textClassName,
       )}

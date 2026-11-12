@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Landmark, Plus, SearchX } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { FilterBar, SearchField } from "@/components/shared/filter-bar";
+import { FilterBar, FilterField, SearchField } from "@/components/shared/filter-bar";
 import { Pagination } from "@/components/shared/pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
@@ -68,23 +68,23 @@ export default async function FinancingPage({ searchParams }: { searchParams: Pr
         <SearchField defaultValue={filters.q} placeholder="Search application, bank, model, or prospect…" />
         <DateRangeFilter from={dateRange.from} to={dateRange.to} preset={dateRange.preset} />
         {isAdmin ? (
-          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+          <FilterField label="Owner"><Select name="owner" defaultValue={filters.owner ?? ""} className="h-10 w-full sm:min-w-40">
             <option value="">All owners</option>
             {owners.map((owner) => (<option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>))}
-          </Select>
+          </Select></FilterField>
         ) : null}
-        <Select name="status" defaultValue={filters.status ?? ""} className="h-8 w-auto min-w-36">
+        <FilterField label="Status"><Select name="status" defaultValue={filters.status ?? ""} className="h-10 w-full sm:min-w-36">
           <option value="">All statuses</option>
           <option value="pending">Pending / in progress</option>
           {(statuses.length ? statuses : FINANCING_STATUS_FALLBACK).map((status) => (<option key={status} value={status}>{status}</option>))}
-        </Select>
-        <Select name="bank" defaultValue={filters.bank ?? ""} className="h-8 w-auto min-w-32">
+        </Select></FilterField>
+        <FilterField label="Bank"><Select name="bank" defaultValue={filters.bank ?? ""} className="h-10 w-full sm:min-w-36">
           <option value="">All banks</option>
           {banks.map((bank) => (<option key={bank} value={bank}>{bank}</option>))}
-        </Select>
-        <div className="flex items-center gap-1.5">
-          <Button type="submit" size="sm" variant="outline">Apply</Button>
-          {hasFilters ? <Button asChild size="sm" variant="ghost"><Link href="/financing"><SearchX /> Reset</Link></Button> : null}
+        </Select></FilterField>
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+          <Button type="submit" variant="outline" className="h-10">Apply</Button>
+          {hasFilters ? <Button asChild variant="ghost" className="h-10"><Link href="/financing"><SearchX /> Reset</Link></Button> : null}
         </div>
       </FilterBar>
 

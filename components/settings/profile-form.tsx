@@ -37,16 +37,16 @@ export function ProfileForm({
         </CardHeader>
         <CardContent className="space-y-3">
           {uploadState.error ? (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{uploadState.error}</p>
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">{uploadState.error}</p>
           ) : null}
           {removeState.error ? (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{removeState.error}</p>
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">{removeState.error}</p>
           ) : null}
           {uploadState.ok && uploadState.message ? (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">{uploadState.message}</p>
+            <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-[12px] text-success">{uploadState.message}</p>
           ) : null}
           {removeState.ok && removeState.message ? (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700">{removeState.message}</p>
+            <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-[12px] text-success">{removeState.message}</p>
           ) : null}
           <div className="flex flex-wrap items-center gap-4">
             <AvatarImage name={displayName} avatarUrl={avatarUrl} className="h-16 w-16 text-[16px]" />
@@ -80,12 +80,12 @@ export function ProfileForm({
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {state.error ? (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700 sm:col-span-2">
+              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-[12px] text-destructive sm:col-span-2">
                 {state.error}
               </p>
             ) : null}
             {state.ok && state.message ? (
-              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-700 sm:col-span-2">
+              <p className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-[12px] text-success sm:col-span-2">
                 {state.message}
               </p>
             ) : null}

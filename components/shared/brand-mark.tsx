@@ -35,10 +35,12 @@ export function BrandMark({
     );
   }
 
+  const isSvg = src.endsWith(".svg");
+
   return (
     <span
       className={cn(
-        "relative flex items-center justify-center overflow-hidden rounded-lg bg-white",
+        "relative flex items-center justify-center overflow-hidden rounded-lg bg-card text-foreground ring-1 ring-border/60",
         className,
       )}
     >
@@ -46,7 +48,11 @@ export function BrandMark({
       <img
         src={src}
         alt={alt}
-        className={cn("h-full w-full object-contain", imageClassName)}
+        className={cn(
+          "h-full w-full object-contain",
+          isSvg && "p-1 dark:invert",
+          imageClassName,
+        )}
         loading={priorityHint ? "eager" : "lazy"}
         decoding="async"
         onError={() => setIndex((value) => value + 1)}

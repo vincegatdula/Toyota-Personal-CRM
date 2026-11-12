@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { CalendarClock, Plus, SearchX } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { FilterBar, SearchField } from "@/components/shared/filter-bar";
+import { FilterBar, FilterField, SearchField } from "@/components/shared/filter-bar";
 import { Pagination } from "@/components/shared/pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DateRangeFilter } from "@/components/shared/date-range-filter";
@@ -63,21 +63,21 @@ export default async function ReservationsPage({ searchParams }: { searchParams:
         <SearchField defaultValue={filters.q} placeholder="Search reservation, model, channel, or prospect…" />
         <DateRangeFilter from={dateRange.from} to={dateRange.to} preset={dateRange.preset} />
         {isAdmin ? (
-          <Select name="owner" defaultValue={filters.owner ?? ""} className="h-8 w-auto min-w-36">
+          <FilterField label="Owner"><Select name="owner" defaultValue={filters.owner ?? ""} className="h-10 w-full sm:min-w-40">
             <option value="">All owners</option>
             {owners.map((owner) => (<option key={owner.id} value={owner.id}>{profileLabel(owner, owner.id)}</option>))}
-          </Select>
+          </Select></FilterField>
         ) : null}
-        <Select name="status" defaultValue={filters.status ?? ""} className="h-8 w-auto min-w-36">
+        <FilterField label="Status"><Select name="status" defaultValue={filters.status ?? ""} className="h-10 w-full sm:min-w-36">
           <option value="">All statuses</option>
           {(statuses.length ? statuses : RESERVATION_STATUS_FALLBACK).map((status) => (<option key={status} value={status}>{status}</option>))}
-        </Select>
-        <label className="flex items-center gap-1.5 text-[12px]">
-          <input type="checkbox" name="overdue" value="1" defaultChecked={filters.overdue === "1"} /> Overdue expected release
+        </Select></FilterField>
+        <label className="flex h-10 items-center gap-2 rounded-lg border border-input bg-card px-3 text-[13px] text-foreground sm:self-end">
+          <input type="checkbox" name="overdue" value="1" defaultChecked={filters.overdue === "1"} className="h-4 w-4 accent-brand" /> Overdue expected release
         </label>
-        <div className="flex items-center gap-1.5">
-          <Button type="submit" size="sm" variant="outline">Apply</Button>
-          {hasFilters ? <Button asChild size="sm" variant="ghost"><Link href="/reservations"><SearchX /> Reset</Link></Button> : null}
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+          <Button type="submit" variant="outline" className="h-10">Apply</Button>
+          {hasFilters ? <Button asChild variant="ghost" className="h-10"><Link href="/reservations"><SearchX /> Reset</Link></Button> : null}
         </div>
       </FilterBar>
 
@@ -115,7 +115,7 @@ export default async function ReservationsPage({ searchParams }: { searchParams:
                   </TableCell>
                   <TableCell><ReservationBadge status={row.current_status} /></TableCell>
                   <TableCell>
-                    <span className={isOverdue(row.expected_release_date) && !["Released", "Cancelled"].includes(row.current_status) ? "font-medium text-red-700" : ""}>{formatDate(row.expected_release_date)}</span>
+                    <span className={isOverdue(row.expected_release_date) && !["Released", "Cancelled"].includes(row.current_status) ? "font-medium text-destructive" : ""}>{formatDate(row.expected_release_date)}</span>
                   </TableCell>
                   <TableCell>
                     <span className="block max-w-[220px] truncate">{row.next_action || "—"}</span>

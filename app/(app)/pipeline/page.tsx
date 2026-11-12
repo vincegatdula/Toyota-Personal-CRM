@@ -38,9 +38,9 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
       />
       <FilterBar>
         <DateRangeFilter from={dateRange.from} to={dateRange.to} preset={dateRange.preset} />
-        <div className="flex items-center gap-1.5">
-          <Button type="submit" size="sm" variant="outline">Apply</Button>
-          <Button asChild type="button" size="sm" variant="ghost"><a href="/pipeline">Reset</a></Button>
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:self-end">
+          <Button type="submit" variant="outline" className="h-10">Apply</Button>
+          <Button asChild type="button" variant="ghost" className="h-10"><a href="/pipeline">Reset</a></Button>
         </div>
       </FilterBar>
       <PipelineBoard leads={leads} statuses={ordered} />

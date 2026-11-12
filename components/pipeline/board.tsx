@@ -69,16 +69,19 @@ export function PipelineBoard({
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="relative max-w-xs flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filter this board…"
-            className="h-8 w-full rounded-lg border border-input bg-card pr-3 pl-8 text-[12px] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:outline-none"
-          />
-        </div>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <label className="flex w-full max-w-xs flex-col gap-1 text-[11px] font-medium text-muted-foreground">
+          <span>Filter board</span>
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search this board…"
+              className="h-10 w-full rounded-lg border border-input bg-card pr-3 pl-8 text-[13px] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:outline-none"
+            />
+          </div>
+        </label>
         <p className="text-[11px] text-muted-foreground">
           Drag a card between columns, or use the status menu.
         </p>
@@ -104,12 +107,12 @@ export function PipelineBoard({
                 setDragging(null);
               }}
               className={cn(
-                "flex w-[264px] shrink-0 flex-col rounded-xl border border-border bg-[#f4f3f1] p-2",
-                overColumn === status && "border-brand/40 bg-red-50/40",
+                "flex w-[264px] shrink-0 flex-col rounded-xl border border-border bg-muted/50 p-2",
+                overColumn === status && "border-brand/40 bg-brand/10",
               )}
             >
               <div className="mb-2 flex items-center justify-between px-1">
-                <span className="truncate text-[11px] font-semibold tracking-wide text-stone-600 uppercase">
+                <span className="truncate text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                   {status}
                 </span>
                 <span className="rounded bg-card px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground tabular-nums">
@@ -151,7 +154,7 @@ export function PipelineBoard({
                           className={cn(
                             "ml-1",
                             isOverdue(lead.next_action_due_date)
-                              ? "font-medium text-red-700"
+                              ? "font-medium text-destructive"
                               : "text-muted-foreground",
                           )}
                         >
