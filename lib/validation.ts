@@ -110,6 +110,24 @@ export const releaseSchema = z.object({
     .transform((v) => v === "on" || v === "true" || v === true),
 });
 
+const recoveryStatusInput = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => {
+    if (!v) return undefined;
+    const normalized = v.toLowerCase();
+    return normalized === "open" ||
+      normalized === "recovered" ||
+      normalized === "closed"
+      ? normalized
+      : v;
+  })
+  .refine(
+    (v) => v === undefined || ["open", "recovered", "closed"].includes(v),
+    { message: "Select a valid recovery status" },
+  );
+
 export const lostSaleSchema = z.object({
   lead_id: z.string().uuid("Select a prospect"),
   date_marked_lost: requiredDate,
@@ -133,7 +151,7 @@ export const lostSaleSchema = z.object({
     .transform((v) => v === "on" || v === "true" || v === true),
   recovery_next_action: optionalText,
   coaching_notes: optionalText,
-  recovery_status: z.enum(["open", "recovered", "closed"]).optional(),
+  recovery_status: recoveryStatusInput.transform((v) => v as "open" | "recovered" | "closed" | undefined),
 });
 
 export const targetSchema = z.object({

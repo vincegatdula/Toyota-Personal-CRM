@@ -5,18 +5,32 @@ export interface ActionState {
   ok: boolean;
   error?: string;
   message?: string;
+  values?: Record<string, string>;
 }
 
 export const initialActionState: ActionState = { ok: true };
 
-export function actionError(error: unknown): ActionState {
+export function formValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("$ACTION")) continue;
+    if (value instanceof File) continue;
+    values[key] = String(value);
+  }
+  return values;
+}
+
+export function actionError(
+  error: unknown,
+  values?: Record<string, string>,
+): ActionState {
   if (error instanceof ZodError) {
-    return { ok: false, error: firstError(error) };
+    return { ok: false, error: firstError(error), values };
   }
   if (error instanceof Error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: error.message, values };
   }
-  return { ok: false, error: "Something went wrong. Please try again." };
+  return { ok: false, error: "Something went wrong. Please try again.", values };
 }
 
 export function n(value: unknown): string | null {

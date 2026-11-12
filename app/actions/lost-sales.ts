@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import { formToObject, lostSaleSchema } from "@/lib/validation";
-import { actionError, n, type ActionState } from "@/lib/actions-helpers";
+import { actionError, formValues, n, type ActionState } from "@/lib/actions-helpers";
 import { manilaTimestamp, todayISO } from "@/lib/dates";
 
 function revalidateLost(leadId?: string) {
@@ -16,12 +16,22 @@ function revalidateLost(leadId?: string) {
   if (leadId) revalidatePath(`/prospects/${leadId}`);
 }
 
+function normalizeRecoveryStatus(value: string | null): "open" | "recovered" | "closed" | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === "open" || normalized === "recovered" || normalized === "closed") {
+    return normalized;
+  }
+  return null;
+}
+
 export async function saveLostSale(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   const context = await requireAuthContext();
   const { supabase, user } = context;
+  const valuesForState = formValues(formData);
   let redirectTo: string | null = null;
   try {
     const parsed = lostSaleSchema.parse(formToObject(formData));
@@ -58,34 +68,52 @@ export async function saveLostSale(
       const { error } = await updateQuery;
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await supabase
+      // Mitigate duplicate creates on retries by reusing a recent identical record if present.
+      let recentQuery = supabase
         .from("lost_sales")
-        .insert({ ...values, owner_id: lead.owner_id });
-      if (error) throw new Error(error.message);
-      {
-        let leadUpdate = supabase
-          .from("leads")
-          .update({
-            pipeline_status: "Lost",
-            lost_at: manilaTimestamp(`${parsed.date_marked_lost}T12:00`),
-          })
-          .eq("id", parsed.lead_id);
-        if (!context.isAdmin) leadUpdate = leadUpdate.eq("owner_id", user.id);
-        await leadUpdate;
+        .select("id, created_at")
+        .eq("lead_id", parsed.lead_id)
+        .eq("date_marked_lost", parsed.date_marked_lost)
+        .eq("primary_loss_reason", parsed.primary_loss_reason)
+        .eq("recovery_status", values.recovery_status)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (!context.isAdmin) recentQuery = recentQuery.eq("owner_id", user.id);
+      const { data: recent } = await recentQuery.maybeSingle();
+      const isRecentDuplicate =
+        recent?.created_at &&
+        Date.now() - new Date(recent.created_at).getTime() < 2 * 60 * 1000;
+
+      if (!isRecentDuplicate) {
+        const { error } = await supabase
+          .from("lost_sales")
+          .insert({ ...values, owner_id: lead.owner_id });
+        if (error) throw new Error(error.message);
+        {
+          let leadUpdate = supabase
+            .from("leads")
+            .update({
+              pipeline_status: "Lost",
+              lost_at: manilaTimestamp(`${parsed.date_marked_lost}T12:00`),
+            })
+            .eq("id", parsed.lead_id);
+          if (!context.isAdmin) leadUpdate = leadUpdate.eq("owner_id", user.id);
+          await leadUpdate;
+        }
+        await supabase.from("lead_activities").insert({
+          lead_id: parsed.lead_id,
+          owner_id: lead.owner_id,
+          activity_type: "Status change",
+          activity_at: new Date().toISOString(),
+          summary: `Marked lost: ${parsed.primary_loss_reason}${parsed.recoverable ? " (recoverable)" : ""}`,
+          created_by: user.id,
+        });
       }
-      await supabase.from("lead_activities").insert({
-        lead_id: parsed.lead_id,
-        owner_id: lead.owner_id,
-        activity_type: "Status change",
-        activity_at: new Date().toISOString(),
-        summary: `Marked lost: ${parsed.primary_loss_reason}${parsed.recoverable ? " (recoverable)" : ""}`,
-        created_by: user.id,
-      });
     }
     revalidateLost(parsed.lead_id);
     redirectTo = "/lost-sales";
   } catch (error) {
-    return actionError(error);
+    return actionError(error, valuesForState);
   }
   if (redirectTo) redirect(redirectTo);
   return { ok: true };
@@ -95,9 +123,8 @@ export async function updateLostRecovery(formData: FormData) {
   const context = await requireAuthContext();
   const { supabase, user } = context;
   const id = n(formData.get("id"));
-  const status = n(formData.get("recovery_status"));
+  const status = normalizeRecoveryStatus(n(formData.get("recovery_status")));
   if (!id || !status) return;
-  if (!["open", "recovered", "closed"].includes(status)) return;
 
   let recordQuery = supabase
     .from("lost_sales")

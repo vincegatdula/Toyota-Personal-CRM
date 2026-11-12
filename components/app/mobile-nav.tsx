@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { NavItems } from "@/components/app/nav-items";
@@ -21,6 +22,7 @@ export function MobileNav({
   isAdmin?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const canUseDOM = typeof document !== "undefined";
 
   useEffect(() => {
     if (!open) return;
@@ -38,6 +40,53 @@ export function MobileNav({
     };
   }, [open]);
 
+  const drawer = open ? (
+    <div className="lg:hidden" role="presentation">
+      <button
+        type="button"
+        aria-label="Close navigation"
+        data-mobile-nav-backdrop="true"
+        className="fixed inset-0 z-[110] h-[100dvh] w-screen bg-black/50"
+        onClick={() => setOpen(false)}
+      />
+      <div
+        id="mobile-nav-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        data-mobile-nav-drawer="true"
+        className="fixed inset-y-0 left-0 z-[120] flex h-[100dvh] w-[min(20rem,calc(100vw-3rem))] flex-col overflow-y-auto overscroll-contain border-r border-stone-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))] text-stone-900 shadow-xl"
+      >
+        <div className="mb-5 flex shrink-0 items-center justify-between px-1">
+          <Link
+            href="/dashboard"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2"
+          >
+            <BrandMark className="h-8 w-8 border border-border/60" />
+            <span className="text-[13px] font-semibold">{APP_NAME}</span>
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X />
+          </Button>
+        </div>
+        <NavItems isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
+        <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-stone-200 pt-3 text-[11px] text-stone-500">
+          <AvatarImage name={name} avatarUrl={avatarUrl} className="h-7 w-7 text-[10px]" />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-stone-900">{name}</p>
+            <p className="truncate">{email}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       <Button
@@ -51,50 +100,7 @@ export function MobileNav({
       >
         <Menu />
       </Button>
-      {open ? (
-        <div className="fixed inset-0 z-[100] lg:hidden" role="presentation">
-          <button
-            type="button"
-            aria-label="Close navigation"
-            className="absolute inset-0 z-0 bg-black/50"
-            onClick={() => setOpen(false)}
-          />
-          <div
-            id="mobile-nav-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation menu"
-            className="relative z-10 flex h-full max-h-dvh w-[min(20rem,calc(100vw-3rem))] flex-col overflow-y-auto border-r border-stone-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] pt-[max(0.75rem,env(safe-area-inset-top))] text-stone-900 shadow-xl"
-          >
-            <div className="mb-5 flex shrink-0 items-center justify-between px-1">
-              <Link
-                href="/dashboard"
-                onClick={() => setOpen(false)}
-                className="flex items-center gap-2"
-              >
-                <BrandMark className="h-8 w-8 border border-border/60" />
-                <span className="text-[13px] font-semibold">{APP_NAME}</span>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setOpen(false)}
-                aria-label="Close navigation"
-              >
-                <X />
-              </Button>
-            </div>
-            <NavItems isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
-            <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-stone-200 pt-3 text-[11px] text-stone-500">
-              <AvatarImage name={name} avatarUrl={avatarUrl} className="h-7 w-7 text-[10px]" />
-              <div className="min-w-0">
-                <p className="truncate font-medium text-stone-900">{name}</p>
-                <p className="truncate">{email}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {canUseDOM && drawer ? createPortal(drawer, document.body) : null}
     </>
   );
 }

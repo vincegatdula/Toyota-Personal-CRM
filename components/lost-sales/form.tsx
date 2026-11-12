@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 import { Loader2, Save } from "lucide-react";
 import { saveLostSale } from "@/app/actions/lost-sales";
@@ -22,6 +22,13 @@ import type { OptionMap } from "@/lib/data/options";
 import type { LeadPicker } from "@/lib/data/records";
 import type { LostSale, VehicleModel } from "@/types/database";
 
+const RECOVERY_STATUS_OPTIONS = [
+  { label: "Open", value: "open" },
+  { label: "Recovered", value: "recovered" },
+  { label: "Closed", value: "closed" },
+] as const;
+const RECOVERY_VALUES = new Set(["open", "recovered", "closed"]);
+
 function labels(
   options: OptionMap,
   category: string,
@@ -31,6 +38,12 @@ function labels(
   const values = (options[category] ?? []).map((row) => row.label);
   const base = values.length ? values : fallback;
   return current && !base.includes(current) ? [current, ...base] : base;
+}
+
+function v(stateValues: Record<string, string> | undefined, key: string, fallback?: string | null) {
+  const fromState = stateValues?.[key];
+  if (fromState !== undefined) return fromState;
+  return fallback ?? "";
 }
 
 export function LostSaleForm({
@@ -52,43 +65,51 @@ export function LostSaleForm({
     saveLostSale,
     initialActionState,
   );
-  const [leadId, setLeadId] = useState(record?.lead_id ?? defaultLeadId ?? "");
-  const [source, setSource] = useState(record?.lead_source ?? "");
-  const [model, setModel] = useState(record?.preferred_model ?? "");
+  const stateValues = state.values;
+
+  const selectedLeadId = v(stateValues, "lead_id", record?.lead_id ?? defaultLeadId ?? "");
+  const selectedLead = leads.find((row) => row.id === selectedLeadId);
+  const selectedSource = v(
+    stateValues,
+    "lead_source",
+    record?.lead_source ?? selectedLead?.lead_source ?? "",
+  );
+  const selectedModel = v(
+    stateValues,
+    "preferred_model",
+    record?.preferred_model ?? selectedLead?.preferred_model ?? "",
+  );
 
   const reasons = labels(
     options,
     OPTION_CATEGORIES.lostSaleReason,
     LOST_SALE_REASON_FALLBACK,
-    record?.primary_loss_reason,
+    v(stateValues, "primary_loss_reason", record?.primary_loss_reason),
   );
   const stages = labels(
     options,
     OPTION_CATEGORIES.lostSaleStage,
     LOST_SALE_STAGE_FALLBACK,
-    record?.pipeline_stage_when_lost,
+    v(stateValues, "pipeline_stage_when_lost", record?.pipeline_stage_when_lost),
   );
   const sources = labels(
     options,
     OPTION_CATEGORIES.leadSource,
     LEAD_SOURCE_FALLBACK,
-    record?.lead_source,
-  );
-  const recoveryStatuses = labels(
-    options,
-    OPTION_CATEGORIES.recoveryStatus,
-    ["open", "recovered", "closed"],
-    record?.recovery_status,
+    selectedSource || null,
   );
 
-  function onLeadChange(value: string) {
-    setLeadId(value);
-    const lead = leads.find((row) => row.id === value);
-    if (lead) {
-      setSource(lead.lead_source ?? "");
-      setModel(lead.preferred_model ?? "");
-    }
-  }
+  const rawRecovery =
+    stateValues?.recovery_status ?? record?.recovery_status ?? "open";
+  const normalizedRecovery = rawRecovery.toLowerCase();
+  const recoveryDefault = RECOVERY_VALUES.has(normalizedRecovery)
+    ? normalizedRecovery
+    : "open";
+  const customRecoveryOptions =
+    (options[OPTION_CATEGORIES.recoveryStatus] ?? [])
+      .map((row) => row.label.trim().toLowerCase())
+      .filter((value) => value && !RECOVERY_VALUES.has(value))
+      .map((value) => ({ label: value, value }));
 
   return (
     <form action={formAction} className="space-y-3">
@@ -110,8 +131,8 @@ export function LostSaleForm({
               id="lead_id"
               name="lead_id"
               required
-              value={leadId}
-              onChange={(event) => onLeadChange(event.target.value)}
+              key={`lead-${selectedLeadId}`}
+              defaultValue={selectedLeadId}
             >
               <option value="">Select a prospect</option>
               {leads.map((lead) => (
@@ -128,7 +149,7 @@ export function LostSaleForm({
               name="date_marked_lost"
               type="date"
               required
-              defaultValue={record?.date_marked_lost ?? today}
+              defaultValue={v(stateValues, "date_marked_lost", record?.date_marked_lost ?? today)}
             />
           </div>
           <div className="space-y-1.5">
@@ -137,7 +158,7 @@ export function LostSaleForm({
               id="primary_loss_reason"
               name="primary_loss_reason"
               required
-              defaultValue={record?.primary_loss_reason ?? reasons[0]}
+              defaultValue={v(stateValues, "primary_loss_reason", record?.primary_loss_reason ?? reasons[0])}
             >
               {reasons.map((reason) => (
                 <option key={reason} value={reason}>
@@ -151,8 +172,8 @@ export function LostSaleForm({
             <Select
               id="lead_source"
               name="lead_source"
-              value={source}
-              onChange={(event) => setSource(event.target.value)}
+              key={`source-${selectedLeadId}-${selectedSource}`}
+              defaultValue={selectedSource}
             >
               <option value="">—</option>
               {sources.map((value) => (
@@ -168,8 +189,8 @@ export function LostSaleForm({
               id="preferred_model"
               name="preferred_model"
               list="lost-model-options"
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
+              key={`model-${selectedLeadId}-${selectedModel}`}
+              defaultValue={selectedModel}
             />
             <datalist id="lost-model-options">
               {models.map((row) => (
@@ -182,7 +203,7 @@ export function LostSaleForm({
             <Select
               id="pipeline_stage_when_lost"
               name="pipeline_stage_when_lost"
-              defaultValue={record?.pipeline_stage_when_lost ?? ""}
+              defaultValue={v(stateValues, "pipeline_stage_when_lost", record?.pipeline_stage_when_lost ?? "")}
             >
               <option value="">—</option>
               {stages.map((stage) => (
@@ -200,7 +221,11 @@ export function LostSaleForm({
               type="number"
               min={1}
               step={1}
-              defaultValue={record?.estimated_units_lost ?? 1}
+              defaultValue={v(
+                stateValues,
+                "estimated_units_lost",
+                String(record?.estimated_units_lost ?? 1),
+              )}
             />
           </div>
           <div className="space-y-1.5">
@@ -208,7 +233,7 @@ export function LostSaleForm({
             <Input
               id="competitor_alternative"
               name="competitor_alternative"
-              defaultValue={record?.competitor_alternative ?? ""}
+              defaultValue={v(stateValues, "competitor_alternative", record?.competitor_alternative ?? "")}
             />
           </div>
           <div className="space-y-1.5">
@@ -216,7 +241,7 @@ export function LostSaleForm({
             <Input
               id="financing_payment_issue"
               name="financing_payment_issue"
-              defaultValue={record?.financing_payment_issue ?? ""}
+              defaultValue={v(stateValues, "financing_payment_issue", record?.financing_payment_issue ?? "")}
             />
           </div>
           <div className="space-y-1.5">
@@ -226,11 +251,16 @@ export function LostSaleForm({
             <Select
               id="recovery_status"
               name="recovery_status"
-              defaultValue={record?.recovery_status ?? "open"}
+              defaultValue={recoveryDefault}
             >
-              {recoveryStatuses.map((value) => (
-                <option key={value} value={value}>
-                  {value}
+              {RECOVERY_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+              {customRecoveryOptions.map((option) => (
+                <option key={`custom-${option.value}`} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </Select>
@@ -240,7 +270,7 @@ export function LostSaleForm({
             <Input
               id="recovery_next_action"
               name="recovery_next_action"
-              defaultValue={record?.recovery_next_action ?? ""}
+              defaultValue={v(stateValues, "recovery_next_action", record?.recovery_next_action ?? "")}
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
@@ -249,14 +279,18 @@ export function LostSaleForm({
               id="coaching_notes"
               name="coaching_notes"
               rows={3}
-              defaultValue={record?.coaching_notes ?? ""}
+              defaultValue={v(stateValues, "coaching_notes", record?.coaching_notes ?? "")}
             />
           </div>
           <label className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 text-[12px] sm:col-span-2">
             <input
               type="checkbox"
               name="recoverable"
-              defaultChecked={record?.recoverable ?? false}
+              defaultChecked={
+                stateValues
+                  ? stateValues.recoverable === "on"
+                  : (record?.recoverable ?? false)
+              }
               className="mt-0.5"
             />
             <span>This loss looks recoverable — keep a recovery action.</span>
