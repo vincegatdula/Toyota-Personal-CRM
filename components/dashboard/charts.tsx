@@ -31,9 +31,15 @@ const PALETTE = [
 const tooltipStyle = {
   borderRadius: 10,
   border: "1px solid #e7e5e3",
+  backgroundColor: "#ffffff",
+  color: "#1c1917",
   fontSize: 11,
-  boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+  opacity: 1,
 };
+
+const tooltipLabelStyle = { color: "#1c1917", fontWeight: 600 };
+const tooltipItemStyle = { color: "#44403c" };
 
 export function MonthlyChart({
   data,
@@ -41,46 +47,73 @@ export function MonthlyChart({
   data: { label: string; releases: number; prospects: number; closingRatio: number }[];
 }) {
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <ComposedChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-        <CartesianGrid stroke="#efeeec" vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={{ fontSize: 10, fill: "#78716c" }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          allowDecimals={false}
-          tick={{ fontSize: 10, fill: "#78716c" }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <Tooltip contentStyle={tooltipStyle} />
-        <Bar
-          dataKey="prospects"
-          name="Prospects"
-          fill="#e7e5e4"
-          radius={[4, 4, 0, 0]}
-          maxBarSize={28}
-        />
-        <Bar
-          dataKey="releases"
-          name="Releases"
-          fill="#d32f2f"
-          radius={[4, 4, 0, 0]}
-          maxBarSize={28}
-        />
-        <Line
-          type="monotone"
-          dataKey="closingRatio"
-          name="Closing ratio"
-          stroke="#1c1917"
-          strokeWidth={1.5}
-          dot={{ r: 2.5, fill: "#1c1917" }}
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
+    <div className="h-[260px] w-full min-w-0">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+          <CartesianGrid stroke="#efeeec" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fontSize: 10, fill: "#57534e" }}
+            axisLine={false}
+            tickLine={false}
+            interval={0}
+          />
+          <YAxis
+            yAxisId="left"
+            allowDecimals={false}
+            tick={{ fontSize: 10, fill: "#57534e" }}
+            axisLine={false}
+            tickLine={false}
+            width={28}
+          />
+          <YAxis
+            yAxisId="right"
+            orientation="right"
+            allowDecimals
+            tick={{ fontSize: 10, fill: "#57534e" }}
+            axisLine={false}
+            tickLine={false}
+            width={28}
+            tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
+          />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
+            itemStyle={tooltipItemStyle}
+            formatter={(value, name) => {
+              if (name === "Closing ratio") return [`${(Number(value) * 100).toFixed(1)}%`, name];
+              return [value, name];
+            }}
+          />
+          <Bar
+            yAxisId="left"
+            dataKey="prospects"
+            name="Prospects Created"
+            fill="#2563eb"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={24}
+          />
+          <Bar
+            yAxisId="left"
+            dataKey="releases"
+            name="Releases"
+            fill="#d32f2f"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={24}
+          />
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="closingRatio"
+            name="Closing ratio"
+            stroke="#1c1917"
+            strokeWidth={2}
+            dot={{ r: 2.5, fill: "#1c1917" }}
+            activeDot={{ r: 4 }}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -92,24 +125,26 @@ export function DonutChart({
   height?: number;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <PieChart>
-        <Pie
-          data={data}
-          dataKey="value"
-          nameKey="name"
-          innerRadius="55%"
-          outerRadius="82%"
-          paddingAngle={2}
-          stroke="none"
-        >
-          {data.map((entry, index) => (
-            <Cell key={entry.name} fill={PALETTE[index % PALETTE.length]} />
-          ))}
-        </Pie>
-        <Tooltip contentStyle={tooltipStyle} />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="w-full min-w-0" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            innerRadius="55%"
+            outerRadius="82%"
+            paddingAngle={2}
+            stroke="none"
+          >
+            {data.map((entry, index) => (
+              <Cell key={entry.name} fill={PALETTE[index % PALETTE.length]} />
+            ))}
+          </Pie>
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -123,31 +158,33 @@ export function RankedBars({
   color?: string;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart
-        data={data}
-        layout="vertical"
-        margin={{ top: 4, right: 12, left: 4, bottom: 0 }}
-      >
-        <CartesianGrid stroke="#efeeec" horizontal={false} />
-        <XAxis
-          type="number"
-          allowDecimals={false}
-          tick={{ fontSize: 10, fill: "#78716c" }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          type="category"
-          dataKey="name"
-          width={128}
-          tick={{ fontSize: 10, fill: "#57534e" }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <Tooltip contentStyle={tooltipStyle} />
-        <Bar dataKey="value" name="Count" fill={color} radius={[0, 4, 4, 0]} maxBarSize={16} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="w-full min-w-0" style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{ top: 4, right: 12, left: 4, bottom: 0 }}
+        >
+          <CartesianGrid stroke="#efeeec" horizontal={false} />
+          <XAxis
+            type="number"
+            allowDecimals={false}
+            tick={{ fontSize: 10, fill: "#57534e" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={110}
+            tick={{ fontSize: 10, fill: "#44403c" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} itemStyle={tooltipItemStyle} />
+          <Bar dataKey="value" name="Count" fill={color} radius={[0, 4, 4, 0]} maxBarSize={16} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

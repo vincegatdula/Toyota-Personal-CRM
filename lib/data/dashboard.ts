@@ -1,7 +1,8 @@
-import { getAuthContext, getProfile } from "@/lib/auth";
+import { getAuthContext } from "@/lib/auth";
 import { getOptions, getTargetsFor, type OptionMap } from "@/lib/data/options";
 import { normalizePeriod, remainingWorkingDays, toISODate } from "@/lib/dates";
 import { safeFormatDate } from "@/lib/format";
+import { dateRangeFromPeriod, isWithinDateRange, sixMonthTrendEnd } from "@/lib/date-range";
 import {
   FINANCING_STATUS_FALLBACK,
   LEAD_SOURCE_FALLBACK,
@@ -15,6 +16,11 @@ import type {
   Reservation,
   VehicleRelease,
 } from "@/types/database";
+
+export interface DashboardDateRange {
+  from?: string;
+  to?: string;
+}
 
 const FINANCING_TRANSACTIONS = ["financing", "in-house financing"];
 
@@ -118,6 +124,7 @@ function monthKeyOf(year: number, month: number) {
 export async function getDashboardData(
   year: number,
   month: number,
+  range?: DashboardDateRange,
 ): Promise<DashboardData> {
   const period = normalizePeriod(year, month);
   year = period.year;
@@ -125,10 +132,10 @@ export async function getDashboardData(
 
   const context = await getAuthContext();
   const { supabase, user } = context;
-  const [options, targets, profile] = await Promise.all([
+  const profile = context.profile;
+  const [options, targets] = await Promise.all([
     getOptions(),
     getTargetsFor(year, month),
-    getProfile(),
   ]);
 
   const emptyCharts = {
@@ -189,61 +196,81 @@ export async function getDashboardData(
     };
   }
 
-  const periodStart = monthKeyOf(year, month) + "-01";
-  const periodEndDate = new Date(year, month, 0);
-  const periodEnd = toISODate(periodEndDate);
-  const chartStartDate = new Date(year, month - 1 - 5, 1);
+  const trendEnd = sixMonthTrendEnd(range ?? {}, year, month);
+  const trendYear = trendEnd.year;
+  const trendMonth = trendEnd.month;
+  const selectedPeriod = dateRangeFromPeriod(year, month);
+  const selectedRange = range?.from || range?.to
+    ? { from: range.from ?? selectedPeriod.from, to: range.to ?? selectedPeriod.to }
+    : selectedPeriod;
+  const chartStartDate = new Date(trendYear, trendMonth - 1 - 5, 1);
+  const chartEndDate = new Date(trendYear, trendMonth, 0);
   const chartStart = toISODate(chartStartDate);
+  const chartEnd = toISODate(chartEndDate);
+  const kpiStart = selectedRange.from ?? chartStart;
+  const kpiEnd = selectedRange.to ?? chartEnd;
 
-  const [leadsRes, releasesRes, financingRes, lostRes, reservationsRes] =
+  const leadsSelect = "id, lead_code, prospect_name, lead_source, preferred_model, pipeline_status, date_created, is_archived";
+  const releaseSelect = "id, release_code, lead_id, release_date, model_released, units_released, transaction, bank, created_at";
+  const financingSelect = "id, financing_code, lead_id, date_submitted, date_approval, application_status, bank, date_released";
+  const lostSelect = "id, lost_code, lead_id, date_marked_lost, primary_loss_reason, recoverable, recovery_status";
+  const reservationSelect = "id, reservation_code, lead_id, reservation_date, current_status, expected_release_date";
+
+  const [leadsTrendRes, leadsKpiRes, releasesTrendRes, releasesKpiRes, financingRes, lostKpiRes, reservationsKpiRes, pipelineLeadsRes, recentFinancingRes, recentLostRes] =
     await Promise.all([
       (() => {
-        let query = supabase
-          .from("leads")
-          .select(
-            "id, lead_code, prospect_name, lead_source, preferred_model, pipeline_status, date_created, is_archived",
-          );
-        if (!context.isAdmin) query = query.eq("owner_id", user.id);
-        return query;
-      })()
-        .gte("date_created", periodStart)
-        .lte("date_created", periodEnd)
-        .order("date_created", { ascending: true }),
-      (() => {
-        let query = supabase
-          .from("vehicle_releases")
-          .select("*");
-        if (!context.isAdmin) query = query.eq("owner_id", user.id);
-        return query
-          .gte("release_date", chartStart)
-          .lte("release_date", periodEnd)
-          .order("release_date", { ascending: false });
+        let q = supabase.from("leads").select("id, date_created");
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("date_created", chartStart).lte("date_created", chartEnd);
       })(),
       (() => {
-        let query = supabase
-          .from("financing_applications")
-          .select("*");
-        if (!context.isAdmin) query = query.eq("owner_id", user.id);
-        return query.order("date_submitted", { ascending: false });
+        let q = supabase.from("leads").select(leadsSelect);
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("date_created", kpiStart).lte("date_created", kpiEnd).order("date_created", { ascending: true });
       })(),
       (() => {
-        let query = supabase
-          .from("lost_sales")
-          .select("*");
-        if (!context.isAdmin) query = query.eq("owner_id", user.id);
-        return query
-          .gte("date_marked_lost", chartStart)
-          .lte("date_marked_lost", periodEnd)
-          .order("date_marked_lost", { ascending: false });
+        let q = supabase.from("vehicle_releases").select("release_date, units_released");
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("release_date", chartStart).lte("release_date", chartEnd);
       })(),
       (() => {
-        let query = supabase.from("reservations").select("*");
-        if (!context.isAdmin) query = query.eq("owner_id", user.id);
-        return query;
+        let q = supabase.from("vehicle_releases").select(releaseSelect);
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("release_date", kpiStart).lte("release_date", kpiEnd).order("release_date", { ascending: false });
+      })(),
+      (() => {
+        let q = supabase.from("financing_applications").select(financingSelect);
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.or(`and(date_submitted.gte.${kpiStart},date_submitted.lte.${kpiEnd}),and(date_approval.gte.${kpiStart},date_approval.lte.${kpiEnd})`);
+      })(),
+      (() => {
+        let q = supabase.from("lost_sales").select(lostSelect);
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("date_marked_lost", kpiStart).lte("date_marked_lost", kpiEnd).order("date_marked_lost", { ascending: false });
+      })(),
+      (() => {
+        let q = supabase.from("reservations").select(reservationSelect);
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("reservation_date", kpiStart).lte("reservation_date", kpiEnd);
+      })(),
+      (() => {
+        let q = supabase.from("leads").select("pipeline_status, is_archived");
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.eq("is_archived", false);
+      })(),
+      (() => {
+        let q = supabase.from("financing_applications").select(financingSelect);
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("date_submitted", kpiStart).lte("date_submitted", kpiEnd).order("date_submitted", { ascending: false, nullsFirst: false }).limit(5);
+      })(),
+      (() => {
+        let q = supabase.from("lost_sales").select(lostSelect);
+        if (!context.isAdmin) q = q.eq("owner_id", user.id);
+        return q.gte("date_marked_lost", kpiStart).lte("date_marked_lost", kpiEnd).order("date_marked_lost", { ascending: false }).limit(5);
       })(),
     ]);
 
-  const leads = (leadsRes.data ?? []) as Pick<
+  const leadsInPeriod = (leadsKpiRes.data ?? []) as Pick<
     Lead,
     | "id"
     | "lead_code"
@@ -254,44 +281,47 @@ export async function getDashboardData(
     | "date_created"
     | "is_archived"
   >[];
-  const releases = (releasesRes.data ?? []) as VehicleRelease[];
-  const financing = (financingRes.data ?? []) as FinancingApplication[];
-  const lost = (lostRes.data ?? []) as LostSale[];
-  const reservations = (reservationsRes.data ?? []) as Reservation[];
+  const releasesInPeriod = (releasesKpiRes.data ?? []) as Pick<
+    VehicleRelease,
+    "id" | "release_code" | "lead_id" | "release_date" | "model_released" | "units_released" | "transaction" | "bank" | "created_at"
+  >[];
+  const financing = (financingRes.data ?? []) as Pick<
+    FinancingApplication,
+    "id" | "financing_code" | "lead_id" | "date_submitted" | "date_approval" | "application_status" | "bank" | "date_released"
+  >[];
+  const lostInPeriod = (lostKpiRes.data ?? []) as Pick<
+    LostSale,
+    "id" | "lost_code" | "lead_id" | "date_marked_lost" | "primary_loss_reason" | "recoverable" | "recovery_status"
+  >[];
+  const reservations = (reservationsKpiRes.data ?? []) as Pick<
+    Reservation,
+    "id" | "reservation_code" | "lead_id" | "reservation_date" | "current_status" | "expected_release_date"
+  >[];
+  const leadsForTrend = (leadsTrendRes.data ?? []) as Pick<Lead, "id" | "date_created">[];
+  const releasesForTrend = (releasesTrendRes.data ?? []) as Pick<VehicleRelease, "release_date" | "units_released">[];
+  // lost reasons chart uses selected-range lost records (lostInPeriod)
 
-  const inPeriod = (date: string | null | undefined) =>
-    Boolean(date && date >= periodStart && date <= periodEnd);
+  const inSelected = (date: string | null | undefined) => isWithinDateRange(date, selectedRange);
 
-  const releasesInPeriod = releases.filter((r) => inPeriod(r.release_date));
-  const totalReleases = releasesInPeriod.reduce(
-    (sum, r) => sum + r.units_released,
-    0,
-  );
+  const totalReleases = releasesInPeriod.reduce((sum, r) => sum + (r.units_released || 0), 0);
   const financingReleases = releasesInPeriod
     .filter((r) => isFinancingRelease(r))
-    .reduce((sum, r) => sum + r.units_released, 0);
+    .reduce((sum, r) => sum + (r.units_released || 0), 0);
   const tfsReleases = releasesInPeriod
     .filter((r) => isTfsRelease(r))
-    .reduce((sum, r) => sum + r.units_released, 0);
+    .reduce((sum, r) => sum + (r.units_released || 0), 0);
 
-  const leadsInPeriod = leads.filter((l) => inPeriod(l.date_created));
   const prospectsCreated = leadsInPeriod.length;
-
-  const applicationsSubmitted = financing.filter((a) =>
-    inPeriod(a.date_submitted),
-  ).length;
+  const applicationsSubmitted = financing.filter((a) => inSelected(a.date_submitted)).length;
   const approvedApplications = financing.filter(
-    (a) =>
-      inPeriod(a.date_approval) &&
-      ["Approved", "Released"].includes(a.application_status),
+    (a) => inSelected(a.date_approval) && ["Approved", "Released"].includes(a.application_status),
   ).length;
 
-  const lostInPeriod = lost.filter((l) => inPeriod(l.date_marked_lost));
   const pendingUnits = reservations.filter(
-    (r) => inPeriod(r.reservation_date) && r.current_status === "Pending Unit",
+    (r) => inSelected(r.reservation_date) && r.current_status === "Pending Unit",
   ).length;
   const reservedProspects = reservations.filter(
-    (r) => inPeriod(r.reservation_date) && r.current_status === "Reserved",
+    (r) => inSelected(r.reservation_date) && r.current_status === "Reserved",
   ).length;
 
   const closingRatio =
@@ -379,29 +409,27 @@ export async function getDashboardData(
     },
   ];
 
-  // Monthly chart series (6 months ending in the selected period) ------------
+  // Monthly chart series (6 months ending in the selected reporting period) --
   const monthly: MonthlyPoint[] = [];
   for (let offset = 5; offset >= 0; offset -= 1) {
-    const pointDate = new Date(year, month - 1 - offset, 1);
+    const pointDate = new Date(trendYear, trendMonth - 1 - offset, 1);
     const key = monthKeyOf(pointDate.getFullYear(), pointDate.getMonth() + 1);
-    const monthReleases = releases
+    const monthReleases = releasesForTrend
       .filter((r) => monthKey(r.release_date) === key)
-      .reduce((sum, r) => sum + r.units_released, 0);
-    const monthProspects = leads.filter(
-      (l) => monthKey(l.date_created) === key,
-    ).length;
+      .reduce((sum, r) => sum + (r.units_released || 0), 0);
+    const monthProspects = leadsForTrend.filter((l) => monthKey(l.date_created) === key).length;
     monthly.push({
       key,
       label: safeFormatDate(pointDate, "MMM"),
       releases: monthReleases,
       prospects: monthProspects,
-      closingRatio:
-        monthProspects > 0 ? monthReleases / monthProspects : 0,
+      closingRatio: monthProspects > 0 ? monthReleases / monthProspects : 0,
     });
   }
 
   const pipelineCounts = new Map<string, number>();
-  for (const lead of leads.filter((l) => !l.is_archived)) {
+  for (const lead of (pipelineLeadsRes.data ?? []) as Pick<Lead, "pipeline_status" | "is_archived">[]) {
+    if (lead.is_archived) continue;
     const key = lead.pipeline_status || "Unspecified";
     pipelineCounts.set(key, (pipelineCounts.get(key) || 0) + 1);
   }
@@ -413,7 +441,7 @@ export async function getDashboardData(
   }
 
   const financingCounts = new Map<string, number>();
-  for (const application of financing) {
+  for (const application of financing.filter((a) => inSelected(a.date_submitted) || inSelected(a.date_approval))) {
     const key = application.application_status || "Unspecified";
     financingCounts.set(key, (financingCounts.get(key) || 0) + 1);
   }
@@ -475,10 +503,8 @@ export async function getDashboardData(
       financing: financingChart,
       lostReasons: lostReasonChart,
     },
-    recentReleases: releasesInPeriod.slice(0, 5),
-    recentFinancing: financing
-      .filter((a) => inPeriod(a.date_submitted))
-      .slice(0, 5),
-    recentLost: lostInPeriod.slice(0, 5),
+    recentReleases: releasesInPeriod.slice(0, 5) as unknown as VehicleRelease[],
+    recentFinancing: ((recentFinancingRes.data ?? []) as unknown as FinancingApplication[]).slice(0, 5),
+    recentLost: ((recentLostRes.data ?? []) as unknown as LostSale[]).slice(0, 5),
   };
 }

@@ -1,24 +1,18 @@
-export const SETTINGS_TAB_VALUES = ["profile", "lists", "models", "targets", "data", "admin"] as const;
+export const SETTINGS_TAB_VALUES = ["profile", "lists", "models", "targets", "data"] as const;
 
 export type SettingsTab = (typeof SETTINGS_TAB_VALUES)[number];
 
-export function resolveSettingsTab(
-  tab: string | null | undefined,
-  isAdmin: boolean,
-): SettingsTab {
+export function resolveSettingsTab(tab: string | null | undefined): SettingsTab {
   if (tab && (SETTINGS_TAB_VALUES as readonly string[]).includes(tab)) {
-    if (tab === "admin" && !isAdmin) return "profile";
     return tab as SettingsTab;
   }
-  // Default settings landing is profile (never admin by default).
   return "profile";
 }
 
-export function isUserManagementNavActive(pathname: string, tab: string | null | undefined, isAdmin: boolean) {
-  return isAdmin && pathname === "/settings" && resolveSettingsTab(tab, true) === "admin";
+export function isUserManagementNavActive(pathname: string) {
+  return pathname === "/user-management" || pathname.startsWith("/user-management/");
 }
 
-export function isSettingsNavActive(pathname: string, tab: string | null | undefined, isAdmin: boolean) {
-  if (pathname !== "/settings" && !pathname.startsWith("/settings/")) return false;
-  return !isUserManagementNavActive(pathname, tab, isAdmin);
+export function isSettingsNavActive(pathname: string) {
+  return pathname === "/settings" || pathname.startsWith("/settings/");
 }

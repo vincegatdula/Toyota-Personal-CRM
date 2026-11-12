@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/shared/page-header";
+import { FilterBar } from "@/components/shared/filter-bar";
+import { DateRangeFilter } from "@/components/shared/date-range-filter";
 import { PipelineBoard } from "@/components/pipeline/board";
+import { Button } from "@/components/ui/button";
 import { getPipelineLeads } from "@/lib/data/leads";
 import { getOptions, optionLabels } from "@/lib/data/options";
+import { parseDateRangeParams, resolveDateRange } from "@/lib/date-range";
 import {
   ACTIVE_PIPELINE_STATUSES,
   OPTION_CATEGORIES,
@@ -11,20 +15,19 @@ import {
 
 export const metadata: Metadata = { title: "Pipeline" };
 
-export default async function PipelinePage() {
+type Params = Record<string, string | string[] | undefined>;
+
+export default async function PipelinePage({ searchParams }: { searchParams: Promise<Params> }) {
+  const params = await searchParams;
+  const dateRange = resolveDateRange(parseDateRangeParams(params));
   const [leads, options] = await Promise.all([
-    getPipelineLeads(),
+    getPipelineLeads(dateRange),
     getOptions(),
   ]);
   const configured = optionLabels(options, OPTION_CATEGORIES.pipelineStatus);
   const base = configured.length ? configured : PIPELINE_STATUS_FALLBACK;
-  const statuses = base.filter((status) =>
-    ACTIVE_PIPELINE_STATUSES.includes(status),
-  );
-  const ordered = [
-    ...statuses,
-    ...ACTIVE_PIPELINE_STATUSES.filter((status) => !statuses.includes(status)),
-  ];
+  const statuses = base.filter((status) => ACTIVE_PIPELINE_STATUSES.includes(status));
+  const ordered = [...statuses, ...ACTIVE_PIPELINE_STATUSES.filter((status) => !statuses.includes(status))];
 
   return (
     <div className="page-container max-w-none">
@@ -33,6 +36,13 @@ export default async function PipelinePage() {
         title="Pipeline"
         description={`${leads.length} active prospect${leads.length === 1 ? "" : "s"} across ${ordered.length} stages. Drag cards to update the stage instantly.`}
       />
+      <FilterBar>
+        <DateRangeFilter from={dateRange.from} to={dateRange.to} preset={dateRange.preset} />
+        <div className="flex items-center gap-1.5">
+          <Button type="submit" size="sm" variant="outline">Apply</Button>
+          <Button asChild type="button" size="sm" variant="ghost"><a href="/pipeline">Reset</a></Button>
+        </div>
+      </FilterBar>
       <PipelineBoard leads={leads} statuses={ordered} />
     </div>
   );

@@ -20,6 +20,8 @@ export interface LeadFilters {
   status?: string;
   timeline?: string;
   followUp?: string;
+  from?: string;
+  to?: string;
   createdFrom?: string;
   createdTo?: string;
   archived?: string;
@@ -93,8 +95,10 @@ export async function listLeads(filters: LeadFilters): Promise<LeadListResult> {
   if (filters.model) query = query.eq("preferred_model", filters.model);
   if (filters.transaction) query = query.eq("transaction", filters.transaction);
   if (filters.status) query = query.eq("pipeline_status", filters.status);
-  if (filters.createdFrom) query = query.gte("date_created", filters.createdFrom);
-  if (filters.createdTo) query = query.lte("date_created", filters.createdTo);
+  const dateFrom = filters.from ?? filters.createdFrom;
+  const dateTo = filters.to ?? filters.createdTo;
+  if (dateFrom) query = query.gte("date_created", dateFrom);
+  if (dateTo) query = query.lte("date_created", dateTo);
 
   if (filters.timeline === "no_date") {
     query = query.is("purchase_timeline", null);
@@ -215,13 +219,13 @@ export async function getLeadDetail(
   };
 }
 
-export async function getPipelineLeads(): Promise<Lead[]> {
+export async function getPipelineLeads(range?: { from?: string; to?: string }): Promise<Lead[]> {
   const context = await getAuthContext();
   const { supabase, user } = context;
   if (!user) return [];
   let query = supabase
     .from("leads")
-    .select("*")
+    .select("id, lead_code, prospect_name, preferred_model, lead_source, pipeline_status, next_action, next_action_due_date, date_created")
     .eq("is_archived", false)
     .in("pipeline_status", [
       "New Prospect",
@@ -235,12 +239,14 @@ export async function getPipelineLeads(): Promise<Lead[]> {
       "Pending Unit",
     ]);
   if (!context.isAdmin) query = query.eq("owner_id", user.id);
+  if (range?.from) query = query.gte("date_created", range.from);
+  if (range?.to) query = query.lte("date_created", range.to);
   query = query
     .order("next_action_due_date", { ascending: true, nullsFirst: false })
     .order("date_created", { ascending: false });
   const { data, error } = await query;
   if (error) throw new Error(`Could not load the pipeline: ${error.message}`);
-  return data ?? [];
+  return (data ?? []) as Lead[];
 }
 
 export interface LeadPickerItem {

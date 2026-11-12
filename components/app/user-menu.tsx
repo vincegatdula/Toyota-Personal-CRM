@@ -51,10 +51,10 @@ export function UserMenu({
         </DropdownMenuItem>
         {isAdmin ? (
           <DropdownMenuItem asChild>
-            <Link href="/settings?tab=admin">
+            <Link href="/user-management">
               <Shield /> User management
             </Link>
-            </DropdownMenuItem>
+          </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />
         <form action={signOut}>

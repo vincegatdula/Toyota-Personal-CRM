@@ -11,7 +11,6 @@ import {
   UserRound,
   Car,
   ArrowRight,
-  Shield,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ import { ProfileForm } from "@/components/settings/profile-form";
 import { ListsManager } from "@/components/settings/lists-manager";
 import { ModelsManager } from "@/components/settings/models-manager";
 import { TargetsManager } from "@/components/settings/targets-manager";
-import { AdminUsersManager } from "@/components/settings/admin-users-manager";
 import { resolveSettingsTab } from "@/lib/settings-tabs";
 import type { OptionMap } from "@/lib/data/options";
 import type {
@@ -34,8 +32,6 @@ import type {
   Profile,
   VehicleModel,
 } from "@/types/database";
-
-type AdminProfile = Profile & { avatar_signed_url?: string | null };
 
 export function SettingsTabs({
   profile,
@@ -47,9 +43,6 @@ export function SettingsTabs({
   initialYear,
   initialMonth,
   canManageModels,
-  isAdmin,
-  adminProfiles,
-  currentUserId,
 }: {
   profile: Profile | null;
   email: string;
@@ -60,21 +53,18 @@ export function SettingsTabs({
   initialYear: number;
   initialMonth: number;
   canManageModels: boolean;
-  isAdmin: boolean;
-  adminProfiles: AdminProfile[];
-  currentUserId: string;
 }) {
   const period = `${initialYear}-${String(initialMonth).padStart(2, "0")}`;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeTab = resolveSettingsTab(searchParams.get("tab"), isAdmin);
+  const activeTab = resolveSettingsTab(searchParams.get("tab"));
 
   return (
     <Tabs
       value={activeTab}
       onValueChange={(value) => {
-        const nextTab = resolveSettingsTab(value, isAdmin);
+        const nextTab = resolveSettingsTab(value);
         const params = new URLSearchParams(searchParams.toString());
         params.set("tab", nextTab);
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
@@ -94,11 +84,6 @@ export function SettingsTabs({
         <TabsTrigger value="targets">
           <Target className="mr-1 h-3.5 w-3.5" /> Targets
         </TabsTrigger>
-        {isAdmin ? (
-          <TabsTrigger value="admin">
-            <Shield className="mr-1 h-3.5 w-3.5" /> User management
-          </TabsTrigger>
-        ) : null}
         <TabsTrigger value="data">
           <Database className="mr-1 h-3.5 w-3.5" /> Data
         </TabsTrigger>
@@ -145,17 +130,6 @@ export function SettingsTabs({
           initialMonth={initialMonth}
         />
       </TabsContent>
-
-      {isAdmin ? (
-        <TabsContent value="admin">
-          <AdminUsersManager
-            profiles={adminProfiles}
-            initialYear={initialYear}
-            initialMonth={initialMonth}
-            currentUserId={currentUserId}
-          />
-        </TabsContent>
-      ) : null}
 
       <TabsContent value="data">
         <div className="grid gap-3 lg:grid-cols-2">

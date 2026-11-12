@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   BarChart3,
   CalendarClock,
@@ -32,8 +32,6 @@ const ICONS: Record<string, LucideIcon> = {
   Shield,
 };
 
-type NavItem = { href: string; label: string; icon: keyof typeof ICONS };
-
 export function NavItems({
   onNavigate,
   className,
@@ -44,32 +42,24 @@ export function NavItems({
   isAdmin?: boolean;
 }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const tab = searchParams.get("tab");
 
-  const items: NavItem[] = isAdmin
+  const items = isAdmin
     ? [
-        ...NAV_ITEMS.slice(0, -1).map((item) => ({
-          ...item,
-          href: item.href === "/settings" ? "/settings?tab=profile" : item.href,
-        })),
-        { href: "/settings?tab=admin", label: "User management", icon: "Shield" },
-        { href: "/settings?tab=profile", label: "Settings", icon: "Settings" },
+        ...NAV_ITEMS.slice(0, -1),
+        { href: "/user-management", label: "User management", icon: "Shield" as const },
+        { href: "/settings", label: "Settings", icon: "Settings" as const },
       ]
-    : [...NAV_ITEMS].map((item) => ({
-        ...item,
-        href: item.href === "/settings" ? "/settings?tab=profile" : item.href,
-      }));
+    : [...NAV_ITEMS];
 
   return (
     <nav className={cn("flex flex-col gap-0.5", className)}>
       {items.map((item) => {
         const Icon = ICONS[item.icon] ?? LayoutDashboard;
         const active =
-          item.icon === "Shield"
-            ? isUserManagementNavActive(pathname, tab, Boolean(isAdmin))
-            : item.href.startsWith("/settings")
-              ? isSettingsNavActive(pathname, tab, Boolean(isAdmin))
+          item.href === "/user-management"
+            ? isUserManagementNavActive(pathname)
+            : item.href === "/settings"
+              ? isSettingsNavActive(pathname)
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link

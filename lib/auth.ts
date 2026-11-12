@@ -11,10 +11,27 @@ export const getSession = cache(async () => {
   return { supabase, user };
 });
 
-export async function requireUser() {
+export const getProfile = cache(async (): Promise<Profile | null> => {
   const { supabase, user } = await getSession();
-  if (!user) redirect("/login");
-  return { supabase, user };
+  if (!user) return null;
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .maybeSingle();
+  return data ?? null;
+});
+
+export const getAuthContext = cache(async (): Promise<AuthContext> => {
+  const { supabase, user } = await getSession();
+  const profile = user ? await getProfile() : null;
+  return { supabase, user, profile, isAdmin: isCrmAdmin(profile?.role) };
+});
+
+export async function requireUser() {
+  const context = await getAuthContext();
+  if (!context.user) redirect("/login");
+  return context as AuthContext & { user: NonNullable<AuthContext["user"]> };
 }
 
 export interface AuthContext {
@@ -22,12 +39,6 @@ export interface AuthContext {
   user: Awaited<ReturnType<typeof getSession>>["user"];
   profile: Profile | null;
   isAdmin: boolean;
-}
-
-export async function getAuthContext() {
-  const { supabase, user } = await getSession();
-  const profile = user ? await getProfile() : null;
-  return { supabase, user, profile, isAdmin: isCrmAdmin(profile?.role) };
 }
 
 export async function requireAuthContext() {
@@ -50,26 +61,10 @@ export function isCrmAdmin(role: CrmRole | null | undefined) {
 }
 
 export async function requireCrmAdmin() {
-  const { supabase, user } = await getSession();
-  if (!user) throw new Error("You must be signed in.");
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!isCrmAdmin(profile?.role)) {
+  const context = await getAuthContext();
+  if (!context.user) throw new Error("You must be signed in.");
+  if (!context.isAdmin) {
     throw new Error("Only CRM owners or admins can manage vehicle models.");
   }
-  return { supabase, user };
+  return { supabase: context.supabase, user: context.user };
 }
-
-export const getProfile = cache(async (): Promise<Profile | null> => {
-  const { supabase, user } = await getSession();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-  return data ?? null;
-});

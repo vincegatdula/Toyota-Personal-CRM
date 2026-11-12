@@ -9,7 +9,6 @@ import {
   getMonthlyTargets,
 } from "@/lib/data/options";
 import { createAvatarSignedUrl } from "@/lib/avatar";
-import { listProfilesForAdmin } from "@/lib/admin-users";
 import { resolveSettingsTab } from "@/lib/settings-tabs";
 import { currentPeriod } from "@/lib/dates";
 import type { Profile } from "@/types/database";
@@ -35,18 +34,15 @@ export default async function SettingsPage({
   const profile = (profileRes.data as Profile | null) ?? null;
   const avatarUrl = await createAvatarSignedUrl(profile?.avatar_url, user.id);
   const isAdmin = isCrmAdmin(profile?.role);
-  if (!params.tab || resolveSettingsTab(params.tab, isAdmin) !== params.tab) {
-    redirect(`/settings?tab=${resolveSettingsTab(params.tab, isAdmin)}`);
+
+  if (params.tab === "admin" && isAdmin) {
+    redirect("/user-management");
   }
 
-  const adminProfiles = isAdmin
-    ? await Promise.all(
-        (await listProfilesForAdmin()).map(async (row) => ({
-          ...row,
-          avatar_signed_url: await createAvatarSignedUrl(row.avatar_url, row.id),
-        })),
-      )
-    : [];
+  const resolvedTab = resolveSettingsTab(params.tab);
+  if (!params.tab || resolvedTab !== params.tab) {
+    redirect(`/settings?tab=${resolvedTab}`);
+  }
 
   return (
     <div className="page-container">
@@ -65,9 +61,6 @@ export default async function SettingsPage({
         initialYear={period.year}
         initialMonth={period.month}
         canManageModels={isAdmin}
-        isAdmin={isAdmin}
-        adminProfiles={adminProfiles}
-        currentUserId={user.id}
       />
     </div>
   );
